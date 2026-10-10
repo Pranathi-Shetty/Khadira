@@ -1,4 +1,4 @@
-"""All SQLAlchemy models for Everest Textile Mills ERP."""
+"""All SQLAlchemy models for Khadira Textile Mills ERP."""
 from __future__ import annotations
 
 import enum
