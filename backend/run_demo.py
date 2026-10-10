@@ -9,8 +9,9 @@ backend_dir = Path(__file__).resolve().parent
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
-# Force demo database URL
-os.environ["DATABASE_URL"] = "sqlite:///./mill_demo.db"
+# Force demo database URL (absolute path so it works whether run from root or backend/)
+demo_db_path = (backend_dir / "mill_demo.db").resolve()
+os.environ["DATABASE_URL"] = f"sqlite:///{demo_db_path}"
 os.environ["KHADIRA_DEMO"] = "1"
 
 if __name__ == "__main__":
