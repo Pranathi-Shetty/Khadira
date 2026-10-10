@@ -23,9 +23,6 @@ Plus a few support files: login and sessions, a permissions file for who can do 
 ## Security
 Six roles (admin, owner, store, floor supervisor, QC, office), and every endpoint checks the role first. Login uses hashed passwords and a secure session cookie.
 
-## The Git Part
-A teammate had already pushed frontend scaffolding to the remote. Instead of overwriting it, the backend went onto its own branch so both can be merged later through a pull request.
-
 ## Key Verifications
 - QC statuses are strictly: `pass`, `rework`, and `reject`.
 - The yarn check happens when an order is confirmed.

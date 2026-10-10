@@ -2,15 +2,13 @@
 
 ![Status](https://img.shields.io/badge/Status-MVP_Complete-green)
 ![Backend](https://img.shields.io/badge/Backend-FastAPI-009688)
-![Frontend](https://img.shields.io/badge/Frontend-Next.js_15-000000)
 
 A unified, high-performance ERP system designed specifically for Khadira Textile Mills. This platform replaces notebooks, paper slips, and phone calls with a single digital backbone that connects the floor to the front office.
 
 ## 🏗️ Architecture
 
-- **Frontend**: Next.js 15, TypeScript, TailwindCSS, Lucide-React (Modern UI with Glassmorphism)
 - **Backend**: FastAPI, SQLAlchemy 2.0, Alembic, SQLite (Dev) / PostgreSQL (Prod)
-- **Design Philosophy**: Dynamic, responsive, and visually premium interface built over a strictly constrained, transaction-safe relational database.
+- **Design Philosophy**: A transaction-safe backend for textile mill operations, with a documented REST API.
 
 ## 📦 Core Modules
 
@@ -24,9 +22,6 @@ A unified, high-performance ERP system designed specifically for Khadira Textile
 | **QC** | Individual roll inspection routing: `passed` / `rework` / `rejected`. |
 | **Dispatch** | Atomic confirmation with automated stock-out deductions and invoice generation. |
 | **Finance** | Buyer invoices, incoming payments, and comprehensive receivables/payables ledgers. |
-| **Attendance** | Worker register with robust hourly/piece-rate basis tracking. |
-| **Wages** | Monthly wage runs with a multi-step `draft` → `approve` → `finalise` flow. |
-| **Costing** | Advanced order & roll costing: Yarn cost + Wages + Overhead / passed metres. |
 
 ---
 
@@ -63,23 +58,11 @@ python -m uvicorn app:app --reload --port 8000
 | **QC Officer** | `qc` | `khadira2026!` |
 | **Office** | `office` | `khadira2026!` |
 
-### 2. Frontend
-
-The frontend is a Next.js application styled with TailwindCSS.
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-> **Note:** Open [http://localhost:3000](http://localhost:3000) to view the application dashboard.
-
 ---
 
 ## 🧪 Testing
 
-The active backend suite covers health checks, authentication, purchasing, sales orders, inventory, production, QC, and dispatch. The previous implementation's tests are retained in `backend/legacy/` as references.
+The backend suite covers health checks, authentication, purchasing, sales orders, inventory, production, QC, and dispatch.
 
 ```bash
 cd backend
