@@ -75,3 +75,27 @@ def to_store(roll_id: int, db: Db, user: can("rolls.write")) -> dict:
     roll = qc_svc.move_to_store(db, roll_id, user.id)
     db.commit()
     return _out(roll)
+
+
+class DefectIn(BaseModel):
+    defect_type: str
+    severity: str = "minor"
+    location_m: int | None = None
+    notes: str | None = None
+
+@router.post("/{roll_id}/defects", status_code=201)
+def record_defect(roll_id: int, body: DefectIn, db: Db, user: can("qc.write")) -> dict:
+    defect = qc_svc.record_defect(db, roll_id, defect_type=body.defect_type,
+                                  severity=body.severity, location_m=body.location_m,
+                                  notes=body.notes, user_id=user.id)
+    db.commit()
+    return {
+        "id": defect.id,
+        "roll_id": defect.roll_id,
+        "defect_type": defect.defect_type,
+        "severity": defect.severity,
+        "location_m": defect.location_m,
+        "notes": defect.notes,
+        "created_at": defect.created_at.isoformat()
+    }
+

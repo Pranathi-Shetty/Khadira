@@ -19,7 +19,6 @@ def seed():
     factory = make_session_factory(DATABASE_URL)
     from sqlalchemy import create_engine
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-    Base.metadata.create_all(engine)
 
     db = factory()
     try:

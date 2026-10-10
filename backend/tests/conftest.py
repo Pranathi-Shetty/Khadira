@@ -48,7 +48,7 @@ def test_database():
                 db.add(Setting(key=k, value=v))
 
         # Locations
-        for code, name in [("RAW", "Raw Material Store"), ("FIN", "Finished Goods Store")]:
+        for code, name in [("RAW", "Raw Material Store"), ("FIN", "Finished Goods Store"), ("WIP", "Work In Progress"), ("WASTE", "Waste Store")]:
             if db.query(Location).filter_by(code=code).first() is None:
                 db.add(Location(code=code, name=name))
 

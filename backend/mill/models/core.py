@@ -111,3 +111,44 @@ class AuditLog(Base):
     action: Mapped[str] = mapped_column(String(60))
     note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+class StockCountSession(Base):
+    __tablename__ = "stock_count_session"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    location_id: Mapped[int] = mapped_column(ForeignKey("location.id"), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="draft") # draft | pending_approval | approved | rejected
+    counter_id: Mapped[int | None] = mapped_column(ForeignKey("user_account.id"))
+    approver_id: Mapped[int | None] = mapped_column(ForeignKey("user_account.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    
+    location: Mapped[Location] = relationship()
+    lines: Mapped[list["StockCountLine"]] = relationship(back_populates="session", cascade="all, delete-orphan")
+
+class StockCountLine(Base):
+    __tablename__ = "stock_count_line"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("stock_count_session.id"), nullable=False)
+    item_id: Mapped[int] = mapped_column(ForeignKey("item.id"), nullable=False)
+    system_qty_g: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    counted_qty_g: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    variance_g: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    reason: Mapped[str | None] = mapped_column(String(200))
+    
+    session: Mapped[StockCountSession] = relationship(back_populates="lines")
+    item: Mapped[Item] = relationship()
+
+
+class Notification(Base):
+    __tablename__ = "notification"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    recipient_role: Mapped[str | None] = mapped_column(String(40))
+    recipient_id: Mapped[int | None] = mapped_column(ForeignKey("user_account.id"))
+    entity_type: Mapped[str | None] = mapped_column(String(40))
+    entity_id: Mapped[int | None] = mapped_column(Integer)
+    event_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    message: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+

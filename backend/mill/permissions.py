@@ -69,6 +69,7 @@ def permissions_for(role: str) -> set[str]:
             "users.read", "users.write",
             "settings.read", "settings.write",
             "machines.read", "machines.write",
+            "inventory.approve"
         ])
         return all_perms
     return set(perms)

@@ -49,3 +49,28 @@ def move_to_store(db: Session, roll_id: int, user_id: int | None) -> Roll:
     db.add(RollEvent(roll_id=roll.id, event_type="moved_to_store", created_by_id=user_id))
     audit(db, entity="Roll", entity_id=roll.id, action="in_store", user_id=user_id)
     return roll
+
+
+def record_defect(db: Session, roll_id: int, defect_type: str, severity: str,
+                  location_m: int | None, notes: str | None,
+                  user_id: int | None):
+    from ..models.production import RollDefect
+    
+    roll = db.get(Roll, roll_id)
+    if roll is None:
+        raise DomainError("Roll not found.", 404)
+        
+    defect = RollDefect(
+        roll_id=roll.id,
+        defect_type=defect_type,
+        severity=severity,
+        location_m=location_m,
+        notes=notes,
+        created_by_id=user_id
+    )
+    db.add(defect)
+    db.add(RollEvent(roll_id=roll.id, event_type="defect_recorded",
+                     note=f"{severity} {defect_type}", created_by_id=user_id))
+    audit(db, entity="Roll", entity_id=roll.id, action="defect_recorded", user_id=user_id)
+    return defect
+

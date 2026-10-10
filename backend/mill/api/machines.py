@@ -43,3 +43,25 @@ def get_machine(machine_id: int, db: Db, _: can("machines.read")) -> dict:
     if m is None:
         raise DomainError("Machine not found.", 404)
     return _out(m)
+
+class DowntimeIn(BaseModel):
+    reason: str
+    description: str | None = None
+    run_id: int | None = None
+
+class ResolutionIn(BaseModel):
+    resolution: str
+
+@router.post("/{machine_id}/downtime", status_code=201)
+def log_downtime(machine_id: int, body: DowntimeIn, db: Db, user: can("machines.write")) -> dict:
+    dt = svc.log_downtime(db, machine_id=machine_id, reason=body.reason,
+                          description=body.description, run_id=body.run_id, user_id=user.id)
+    db.commit()
+    return {"id": dt.id, "machine_id": dt.machine_id, "start_time": dt.start_time.isoformat()}
+
+@router.post("/downtime/{downtime_id}/resolve")
+def resolve_downtime(downtime_id: int, body: ResolutionIn, db: Db, user: can("machines.write")) -> dict:
+    dt = svc.resolve_downtime(db, downtime_id=downtime_id, resolution=body.resolution, user_id=user.id)
+    db.commit()
+    return {"id": dt.id, "machine_id": dt.machine_id, "end_time": dt.end_time.isoformat()}
+

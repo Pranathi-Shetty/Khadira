@@ -7,14 +7,14 @@ from sqlalchemy.orm import sessionmaker
 
 from .api import (
     auth, dashboard, dispatch, finance, items, machines,
-    orders, partners, production, qc, rolls,
+    orders, partners, production, qc, rolls, reports, inventory,
+    notifications
 )
 from .api import purchasing as purchasing_api
 from .api import settings as settings_api
 from .config import Settings, get_settings
 from .db import make_session_factory
 from .services.common import DomainError
-
 
 def create_app(session_factory: sessionmaker | None = None, settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
@@ -53,7 +53,8 @@ def create_app(session_factory: sessionmaker | None = None, settings: Settings |
         return {"status": "ok", "app": "Khadira"}
 
     for module in (auth, items, partners, purchasing_api, orders, machines,
-                   production, rolls, qc, dispatch, finance, dashboard, settings_api):
+                   production, rolls, qc, dispatch, finance, dashboard, settings_api, reports, inventory, notifications):
         app.include_router(module.router)
 
     return app
+

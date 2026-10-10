@@ -87,3 +87,76 @@ class RollEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     roll: Mapped[Roll] = relationship(back_populates="events")
+
+
+class RunMaterial(Base):
+    __tablename__ = "run_material"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("production_run.id"), nullable=False)
+    lot_id: Mapped[int] = mapped_column(ForeignKey("yarn_lot.id"), nullable=False)
+    stock_move_id: Mapped[int | None] = mapped_column(ForeignKey("stock_move.id"))
+    issued_g: Mapped[int] = mapped_column(BigInteger, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    run: Mapped["ProductionRun"] = relationship(back_populates="materials")
+
+
+class RunReconciliation(Base):
+    __tablename__ = "run_reconciliation"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("production_run.id"), unique=True, nullable=False)
+    
+    # Material side (yarn)
+    planned_g: Mapped[int] = mapped_column(BigInteger, default=0)
+    issued_g: Mapped[int] = mapped_column(BigInteger, default=0)
+    consumed_g: Mapped[int] = mapped_column(BigInteger, default=0)
+    returned_g: Mapped[int] = mapped_column(BigInteger, default=0)
+    process_waste_g: Mapped[int] = mapped_column(BigInteger, default=0)
+    
+    # Output side (fabric)
+    usable_output_cm: Mapped[int] = mapped_column(BigInteger, default=0)
+    qc_rejected_cm: Mapped[int] = mapped_column(BigInteger, default=0)
+    
+    status: Mapped[str] = mapped_column(String(20), default="draft") # draft | finalized
+    reason: Mapped[str | None] = mapped_column(Text)
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("user_account.id"))
+    finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    run: Mapped["ProductionRun"] = relationship(back_populates="reconciliation")
+
+
+class MachineDowntime(Base):
+    __tablename__ = "machine_downtime"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    machine_id: Mapped[int] = mapped_column(ForeignKey("machine.id"), nullable=False)
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("production_run.id"))
+    reason: Mapped[str] = mapped_column(String(50), nullable=False) # e.g. maintenance, breakdown, cleaning, material_shortage
+    description: Mapped[str | None] = mapped_column(Text)
+    
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    end_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolution: Mapped[str | None] = mapped_column(Text)
+    
+    reporter_id: Mapped[int | None] = mapped_column(ForeignKey("user_account.id"))
+    
+    machine: Mapped[Machine] = relationship()
+    run: Mapped[ProductionRun | None] = relationship()
+
+
+class RollDefect(Base):
+    __tablename__ = "roll_defect"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    roll_id: Mapped[int] = mapped_column(ForeignKey("roll.id"), nullable=False)
+    defect_type: Mapped[str] = mapped_column(String(50), nullable=False) # e.g. stain, hole, snag, yarn_break
+    severity: Mapped[str] = mapped_column(String(20), default="minor") # minor, major, critical
+    location_m: Mapped[int | None] = mapped_column(Integer) # approximate position in meters from start
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("user_account.id"))
+
+    roll: Mapped[Roll] = relationship()

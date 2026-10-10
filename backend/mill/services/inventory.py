@@ -57,6 +57,25 @@ def post_move(
 
     move = StockMove(item_id=item_id, location_id=location_id, delta_g=delta_g, ref=ref, note=note)
     db.add(move)
+    
+    # Check for low stock alert
+    if delta_g < 0:
+        # We need the item to get the reorder point
+        item = db.get(Item, item_id)
+        if item and item.reorder_point_kg > 0:
+            total_stock = sum(sl.qty_g for sl in db.scalars(select(StockLevel).where(StockLevel.item_id == item.id)).all())
+            # total_stock has just been updated since level is attached to session
+            if total_stock <= item.reorder_point_kg:
+                from .notifications import create_notification
+                create_notification(
+                    db,
+                    message=f"Low stock alert for {item.name} ({item.sku}). Current: {total_stock/1000}kg, Reorder at: {item.reorder_point_kg/1000}kg.",
+                    event_type="low_stock",
+                    recipient_role="store",
+                    entity_type="Item",
+                    entity_id=item.id
+                )
+
     return move
 
 
@@ -89,3 +108,62 @@ def low_stock_yarn(db: Session) -> list[dict]:
                 "reorder_kg": round(item.reorder_point_kg / 1000, 3),
             })
     return alerts
+
+def create_stock_count(db: Session, location_id: int, counts: list[dict], user_id: int | None):
+    from ..models.core import StockCountSession, StockCountLine
+    session = StockCountSession(location_id=location_id, counter_id=user_id)
+    db.add(session)
+    db.flush()
+    
+    for c in counts:
+        item_id = c["item_id"]
+        counted_qty = c["counted_qty_g"]
+        reason = c.get("reason")
+        sys_qty = stock_for(db, item_id, location_id)
+        variance = counted_qty - sys_qty
+        
+        line = StockCountLine(
+            session_id=session.id,
+            item_id=item_id,
+            system_qty_g=sys_qty,
+            counted_qty_g=counted_qty,
+            variance_g=variance,
+            reason=reason
+        )
+        db.add(line)
+    
+    from .common import audit
+    audit(db, entity="StockCountSession", entity_id=session.id, action="create", user_id=user_id)
+    return session
+
+
+def approve_stock_count(db: Session, session_id: int, user_id: int | None):
+    from ..models.core import StockCountSession
+    from datetime import datetime, timezone
+    from .common import audit
+    
+    session = db.get(StockCountSession, session_id)
+    if not session:
+        raise DomainError("Stock count session not found.")
+    if session.status != "draft":
+        raise DomainError("Only draft sessions can be approved.")
+        
+    session.status = "approved"
+    session.approver_id = user_id
+    session.approved_at = datetime.now(timezone.utc)
+    
+    # Apply variances through ledger
+    for line in session.lines:
+        if line.variance_g != 0:
+            post_move(
+                db,
+                item_id=line.item_id,
+                location_id=session.location_id,
+                delta_g=line.variance_g,
+                ref=f"STOCKCOUNT-{session.id}",
+                note=line.reason or "Stock count variance"
+            )
+            
+    audit(db, entity="StockCountSession", entity_id=session.id, action="approve", user_id=user_id)
+    return session
+
