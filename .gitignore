@@ -26,6 +26,7 @@ Odoo nmit - Copy/
 
 # Python & Backend
 venv*
+.venv/
 __pycache__/
 *.pyc
 *.db

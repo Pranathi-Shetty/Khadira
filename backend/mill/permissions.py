@@ -36,6 +36,8 @@ ROLES: dict[str, dict] = {
             "dispatch.read", "dispatch.write",
             "reports.read",
             "settings.read",
+            "attendance.read", "attendance.write", "attendance.approve",
+            "workers.read", "workers.write",
         ],
     },
     "qc": {
@@ -56,6 +58,8 @@ ROLES: dict[str, dict] = {
             "dispatch.read", "dispatch.write",
             "finance.read", "finance.write",
             "reports.read",
+            "wages.read", "wages.write", "wages.finalise",
+            "costing.read", "costing.write",
         ],
     },
 }

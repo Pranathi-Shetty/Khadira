@@ -11,6 +11,8 @@ from .orders import Order, OrderLine
 from .production import Machine, MachineDowntime, ProductionRun, Roll, RollDefect, RollEvent, RunMaterial, RunReconciliation
 from .finance import Invoice, InvoiceLine, Payment
 from .settings import Setting
+from .workforce import Worker, AttendanceEntry, WageRun, WageRunLine
+from .costing import OrderCost
 
 __all__ = [
     "Base",
@@ -22,6 +24,8 @@ __all__ = [
     "Machine", "MachineDowntime", "ProductionRun", "Roll", "RollDefect", "RollEvent", "RunMaterial", "RunReconciliation",
     "Invoice", "InvoiceLine", "Payment",
     "Setting",
+    "Worker", "AttendanceEntry", "WageRun", "WageRunLine",
+    "OrderCost",
 ]
 
 # Re-export enums and models from models.py for backward compatibility with test_erp.py

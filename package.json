@@ -8,9 +8,11 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "backend": "cd backend && ./venv_mac/bin/python -m uvicorn app:app --reload --port 8000",
-    "backend:seed": "cd backend && ./venv_mac/bin/python -m mill.seed",
-    "backend:test": "cd backend && ./venv_mac/bin/python -m pytest tests/"
+    "backend": "cd backend && .\\.venv\\Scripts\\python.exe -m uvicorn app:app --reload --port 8011",
+    "backend:seed": "cd backend && .\\.venv\\Scripts\\python.exe -m mill.seed",
+    "backend:demo:seed": "cd backend && .\\.venv\\Scripts\\python.exe migrate_schema.py && .\\.venv\\Scripts\\python.exe -m mill.seed && .\\.venv\\Scripts\\python.exe seed_workforce_demo.py",
+    "backend:demo": "cd backend && .\\.venv\\Scripts\\python.exe run_demo.py",
+    "backend:test": "cd backend && .\\.venv\\Scripts\\python.exe -m pytest tests/"
   },
   "dependencies": {
     "lucide-react": "^1.55.0",

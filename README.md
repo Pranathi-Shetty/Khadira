@@ -19,11 +19,17 @@ Unified textile artisan showcase landing page integrated directly with the high-
 ```bash
 npm run backend
 ```
-> The API will be live at `http://127.0.0.1:8000`. Interactive Swagger docs are accessible at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
+> The API will be live at `http://127.0.0.1:8011`. Interactive Swagger docs are accessible at [http://127.0.0.1:8011/docs](http://127.0.0.1:8011/docs).
 
 To re-seed demo data at any time:
 ```bash
 npm run backend:seed
+```
+
+To refresh the complete tracked demo dataset (including workforce, attendance,
+wage runs, costing snapshots, and notifications):
+```bash
+npm run backend:demo:seed
 ```
 
 ### 2. Start the Frontend (Vite)

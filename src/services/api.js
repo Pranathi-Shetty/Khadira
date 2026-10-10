@@ -7,17 +7,18 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export async function apiRequest(endpoint, options = {}) {
+  const { silent = false, ...requestOptions } = options;
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const url = `${API_BASE}${cleanEndpoint}`;
   const headers = {
     'Accept': 'application/json',
-    ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
-    ...options.headers,
+    ...(requestOptions.body && !(requestOptions.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
+    ...requestOptions.headers,
   };
 
   try {
     const res = await fetch(url, {
-      ...options,
+      ...requestOptions,
       headers,
       credentials: 'include', // Sends & receives mill_session cookie
     });
@@ -38,7 +39,9 @@ export async function apiRequest(endpoint, options = {}) {
 
     return data;
   } catch (err) {
-    console.error(`[API Error] ${options.method || 'GET'} ${url}:`, err);
+    if (!silent) {
+      console.error(`[API Error] ${requestOptions.method || 'GET'} ${url}:`, err);
+    }
     throw err;
   }
 }
@@ -114,7 +117,8 @@ export const MillAPI = {
   },
 
   async getMe() {
-    return apiRequest('/auth/me');
+    // A missing session is normal on first load, so avoid a misleading console error.
+    return apiRequest('/auth/me', { silent: true });
   },
 
   // --- Dashboard Metrics ---
@@ -235,17 +239,6 @@ export const MillAPI = {
     return apiRequest(`/qc/defects/${rollId}`);
   },
 
-  // --- Notifications ---
-  async getNotifications() {
-    return apiRequest('/notifications');
-  },
-
-  async markNotificationRead(notifId) {
-    return apiRequest(`/notifications/${notifId}/read`, {
-      method: 'POST',
-    });
-  },
-
   // --- Production Downtime ---
   async reportDowntime(machineId, runId, reason, description) {
     return apiRequest(`/production/downtime`, {
@@ -336,6 +329,89 @@ export const MillAPI = {
   // --- Settings ---
   async getSettings() {
     return apiRequest('/settings');
+  },
+
+  // --- Notifications ---
+  async getNotifications(unreadOnly = false) {
+    const query = unreadOnly ? '?unread_only=true' : '';
+    return apiRequest(`/notifications${query}`);
+  },
+
+  async markNotificationRead(id) {
+    return apiRequest(`/notifications/${id}/read`, {
+      method: 'POST',
+    });
+  },
+
+  async markAllNotificationsRead() {
+    return apiRequest('/notifications/read-all', {
+      method: 'POST',
+    });
+  },
+
+  // --- Workforce & Attendance ---
+  async getWorkers() {
+    return apiRequest('/attendance/workers');
+  },
+
+  async createWorker(data) {
+    return apiRequest('/attendance/workers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getAttendance(params = {}) {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        searchParams.append(k, String(v));
+      }
+    });
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return apiRequest(`/attendance${query}`);
+  },
+
+  async recordAttendance(data) {
+    return apiRequest('/attendance', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async approveAttendance(entryId) {
+    return apiRequest(`/attendance/${entryId}/approve`, {
+      method: 'POST',
+    });
+  },
+
+  // --- Wages ---
+  async getWageRuns() {
+    return apiRequest('/wages');
+  },
+
+  async calculateWages(period) {
+    return apiRequest('/wages/calculate', {
+      method: 'POST',
+      body: JSON.stringify(period),
+    });
+  },
+
+  async finaliseWages(runId) {
+    return apiRequest(`/wages/${runId}/finalise`, {
+      method: 'POST',
+    });
+  },
+
+  // --- Order Costing ---
+  async getOrderCost(orderId) {
+    return apiRequest(`/costing/orders/${orderId}`);
+  },
+
+  async calculateOrderCost(orderId) {
+    return apiRequest(`/costing/orders/${orderId}/calculate`, {
+      method: 'POST',
+    });
   },
 };
 

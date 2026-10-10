@@ -3,6 +3,7 @@
 from datetime import date
 
 from .db import make_session_factory
+from .config import get_settings
 from .models import Base, Item, Location, ITEM_YARN, ITEM_FABRIC
 from .models.core import User
 from .models.partners import Buyer, Supplier
@@ -11,14 +12,16 @@ from .models.settings import Setting
 from .services.auth import hash_password
 from .services.common import set_setting
 
-DATABASE_URL = "sqlite:///./mill.db"
 PASSWORD = "khadira2026!"
 
 
 def seed():
-    factory = make_session_factory(DATABASE_URL)
+    # Respect the selected environment so `backend:seed` refreshes the active
+    # demo database instead of silently writing to a different normal database.
+    database_url = get_settings().database_url
+    factory = make_session_factory(database_url)
     from sqlalchemy import create_engine
-    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+    engine = create_engine(database_url, connect_args={"check_same_thread": False})
 
     db = factory()
     try:

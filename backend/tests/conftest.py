@@ -2,6 +2,8 @@
 
 import os
 import sys
+import tempfile
+import uuid
 from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
@@ -19,7 +21,10 @@ from mill.models.core import User, Location
 from mill.models.settings import Setting
 from mill.services.auth import hash_password
 
-TEST_DB_PATH = "./test_mill.db"
+# Use a per-run file in the system temporary directory.  A fixed path makes
+# the suite fail on Windows when a previous test process still owns its SQLite
+# handle (for example after an interrupted run).
+TEST_DB_PATH = os.path.join(tempfile.gettempdir(), f"khadira_test_{uuid.uuid4().hex}.db")
 TEST_DB_URL  = f"sqlite:///{TEST_DB_PATH}"
 
 

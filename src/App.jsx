@@ -431,17 +431,13 @@ export default function App() {
 
   // Terminal Login & Real Backend State
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [isDashboardOpen, setIsDashboardOpen] = useState(true);
+  const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [loginRole, setLoginRole] = useState('Production Supervisor');
   const [dashboardRole, setDashboardRole] = useState('Production Supervisor');
   const [loginPassword, setLoginPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
-  const [loggedInUser, setLoggedInUser] = useState({
-    username: 'floor_supervisor',
-    full_name: 'Production Supervisor',
-    role: 'floor_supervisor'
-  });
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loggedInUser, setLoggedInUser] = useState(null);
   const [loginError, setLoginError] = useState('');
   const [dashboardSearch, setDashboardSearch] = useState('');
   const [chartHoverMonth, setChartHoverMonth] = useState(null);
@@ -602,10 +598,13 @@ export default function App() {
         setBackendMeta(health);
 
         if (health.online) {
+          let hasSession = false;
           try {
             const me = await MillAPI.getMe();
             if (me && me.id) {
+              hasSession = true;
               setIsLoggedIn(true);
+              setIsDashboardOpen(true);
               setLoggedInUser({
                 ...me,
                 sessionToken: `KH-UID-${me.id}`,
@@ -620,7 +619,9 @@ export default function App() {
           } catch {
             // Not authenticated yet
           }
-          await fetchAllLiveData();
+          if (hasSession) {
+            await fetchAllLiveData();
+          }
         }
       } catch (err) {
         console.warn('Backend init check error:', err);
