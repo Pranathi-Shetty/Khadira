@@ -1,87 +1,89 @@
-# 🏭 Khadira Textile Mills ERP
+# Khadira Textile Mills ERP
 
-![Status](https://img.shields.io/badge/Status-MVP_Complete-green)
-![Backend](https://img.shields.io/badge/Backend-FastAPI-009688)
+Khadira is a backend API for managing core textile-mill workflows. It is built with FastAPI and SQLAlchemy and currently includes inventory, purchasing, orders, production, quality control, dispatch, and finance features.
 
-A unified, high-performance ERP system designed specifically for Khadira Textile Mills. This platform replaces notebooks, paper slips, and phone calls with a single digital backbone that connects the floor to the front office.
+> **Scope:** This repository contains the backend API; it does not include a frontend. Attendance and wage rules are documented, but attendance and payroll API workflows are not implemented yet. Treat this as a development MVP, not a production-ready deployment.
 
-## 🏗️ Architecture
+## Features
 
-- **Backend**: FastAPI, SQLAlchemy 2.0, Alembic, SQLite (Dev) / PostgreSQL (Prod)
-- **Design Philosophy**: A transaction-safe backend for textile mill operations, with a documented REST API.
+- User login, sessions, and role-based access
+- Yarn and fabric inventory, stock movements, and costing
+- Supplier purchase orders and receipts
+- Buyer orders and order progress
+- Machine records and production runs
+- Roll tracking and quality inspection
+- Dispatch, invoicing, and payment recording
+- Dashboard, configuration, and database-backed health check
 
-## 📦 Core Modules
+The API is documented interactively at `/docs` when the server is running. A concise set of business rules is in [docs/business-rules.md](docs/business-rules.md); some documented rules describe planned behavior and are not implemented in the API yet.
 
-| Module | Features & Capabilities |
-|---|---|
-| **Inventory** | Yarn & fabric catalogue with real-time moving-average cost calculation. |
-| **Purchasing** | Purchase orders, yarn receipt, supplier bills, and payable tracking. |
-| **Orders** | Buyer orders with automated yarn sufficiency checks and visual progress tracking. |
-| **Machines** | Real-time machine status tracking (`running`, `idle`, `breakdown`) & change logs. |
-| **Production** | Production runs, precise yarn issuance, and individual roll creation (atomic tracking). |
-| **QC** | Individual roll inspection routing: `passed` / `rework` / `rejected`. |
-| **Dispatch** | Atomic confirmation with automated stock-out deductions and invoice generation. |
-| **Finance** | Buyer invoices, incoming payments, and comprehensive receivables/payables ledgers. |
+## Run locally on Windows PowerShell
 
----
+From the repository root:
 
-## 🚀 Quick Start
-
-### 1. Backend
-
-The backend is built with FastAPI. We recommend using a virtual environment.
-
-```bash
-cd backend
-python -m venv .venv
-# Windows PowerShell: .\.venv\Scripts\Activate.ps1
-# macOS/Linux: source .venv/bin/activate
+```powershell
+Set-Location backend
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt -r requirements-dev.txt
-
-# Load initial schema, roles, partners, stock, and workers
-python -m mill.seed            
-
-# Start the development server
+Copy-Item .env.example .env
+python -m mill.seed
 python -m uvicorn app:app --reload --port 8000
 ```
 
-> **Note:** Open [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) for the interactive Swagger API documentation.
+If `backend\.env` already exists, do not overwrite it with the copy command. The seed command creates the local SQLite database and sample data. It includes shared demo credentials, so use them only for local development and never expose this setup to the public internet.
 
-#### Demo credentials
-
-| Role | Username | Password |
-|---|---|---|
-| **Admin** | `admin` | `khadira2026!` |
-| **Owner** | `owner` | `khadira2026!` |
-| **Store** | `store` | `khadira2026!` |
-| **Floor Supervisor** | `floor_supervisor` | `khadira2026!` |
-| **QC Officer** | `qc` | `khadira2026!` |
-| **Office** | `office` | `khadira2026!` |
-
----
-
-## 🧪 Testing
-
-The backend suite covers health checks, authentication, purchasing, sales orders, inventory, production, QC, and dispatch.
+For macOS or Linux, create and activate the environment with:
 
 ```bash
 cd backend
-python -m pytest tests/ -v
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt -r requirements-dev.txt
+cp .env.example .env
+python -m mill.seed
+python -m uvicorn app:app --reload --port 8000
 ```
 
----
+The API runs at `http://127.0.0.1:8000`.
 
-## 🔒 Key Design Decisions
+## API and health checks
 
-- **Money in Paise**: All financial amounts are stored as integers (paise) to prevent floating-point rounding errors.
-- **Stock in Sub-units**: Yarn is tracked in **grams**, fabric in **centimetres**. A strict DB constraint ensures stock is `never-negative`.
-- **Atomic Roll Lifecycle**: `produced` → `awaiting_qc` → `passed` → `in_store` → `dispatched` (plus `rework`/`rejected` paths).
-- **Wage Run Immutability**: Finalised wage runs cannot be edited or tampered with; necessary corrections require formal adjustment entries.
-- **Cost Traceability**: Every order cost securely traces back to the specific yarn-issue cost snapshots at the exact time of issuance.
-- **Double-Dispatch Prevention**: Guarded by a strict `UNIQUE` constraint on `dispatch_rolls.roll_id`.
+- Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- ReDoc: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
+- Health check: [http://127.0.0.1:8000/api/health](http://127.0.0.1:8000/api/health)
 
----
+The health endpoint checks database connectivity and returns `503` if the database query fails.
 
-## 📖 Documentation
+## Demo accounts
 
-See [`docs/business-rules.md`](docs/business-rules.md) for the full set of established business rules, validation constraints, and workflow definitions approved for the MVP.
+The local seed creates the following accounts. They all use the same development-only password: `khadira2026!`.
+
+| Role | Username |
+|---|---|
+| Administrator | `admin` |
+| Owner | `owner` |
+| Store keeper | `store` |
+| Floor supervisor | `floor_supervisor` |
+| QC inspector | `qc` |
+| Office staff | `office` |
+
+Change the shared password and set a strong, unique `SECRET_KEY` before any deployment. Configure database, cookie, and allowed-origin settings for the target environment; the checked-in `.env.example` is for local development only.
+
+## Run tests
+
+From the repository root:
+
+```powershell
+Set-Location backend
+python -m pytest tests -v
+```
+
+The test suite exercises authentication and the main purchasing, inventory, order, production, QC, dispatch, and finance flows.
+
+## Technical notes
+
+- Financial amounts are stored as integer paise to avoid floating-point rounding.
+- Yarn stock is tracked in grams; fabric length is tracked in centimetres.
+- Stock updates and dispatch operations enforce transactional constraints, including protection against negative stock and duplicate roll dispatch.
+- Local development uses SQLite. Review database, security, and deployment settings before using another database or deploying the service.
