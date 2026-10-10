@@ -12,7 +12,18 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
 ITEM_YARN = "yarn"
+import enum
+
 ITEM_FABRIC = "fabric"
+
+
+class UserRole(str, enum.Enum):
+    admin = "admin"
+    owner = "owner"
+    store = "store"
+    floor_supervisor = "floor_supervisor"
+    qc = "qc"
+    office = "office"
 
 
 def _now() -> datetime:

@@ -36,7 +36,7 @@ def _out(r: Roll) -> dict:
 
 
 @router.get("")
-def list_rolls(db: Db, _: can("rolls.read"), params: Params,
+def list_rolls(db: Db, _: can["rolls.read"], params: Params,
                status: str | None = None) -> dict:
     stmt = select(Roll)
     if status:
@@ -46,7 +46,7 @@ def list_rolls(db: Db, _: can("rolls.read"), params: Params,
 
 
 @router.post("", status_code=201)
-def create_roll(body: RollIn, db: Db, user: can("rolls.write")) -> dict:
+def create_roll(body: RollIn, db: Db, user: can["rolls.write"]) -> dict:
     roll = prod_svc.create_roll(db, run_id=body.run_id, length_cm=body.length_cm,
                                 weight_g=body.weight_g, user_id=user.id)
     db.commit()
@@ -55,7 +55,7 @@ def create_roll(body: RollIn, db: Db, user: can("rolls.write")) -> dict:
 
 
 @router.get("/{roll_id}")
-def get_roll(roll_id: int, db: Db, _: can("rolls.read")) -> dict:
+def get_roll(roll_id: int, db: Db, _: can["rolls.read"]) -> dict:
     from ..services.common import DomainError
     r = db.get(Roll, roll_id)
     if r is None:
@@ -64,14 +64,14 @@ def get_roll(roll_id: int, db: Db, _: can("rolls.read")) -> dict:
 
 
 @router.post("/{roll_id}/inspect")
-def inspect(roll_id: int, body: InspectIn, db: Db, user: can("qc.write")) -> dict:
+def inspect(roll_id: int, body: InspectIn, db: Db, user: can["qc.write"]) -> dict:
     roll = qc_svc.inspect_roll(db, roll_id, body.verdict, body.grade, body.note, user.id)
     db.commit()
     return _out(roll)
 
 
 @router.post("/{roll_id}/store")
-def to_store(roll_id: int, db: Db, user: can("rolls.write")) -> dict:
+def to_store(roll_id: int, db: Db, user: can["rolls.write"]) -> dict:
     roll = qc_svc.move_to_store(db, roll_id, user.id)
     db.commit()
     return _out(roll)
@@ -84,7 +84,7 @@ class DefectIn(BaseModel):
     notes: str | None = None
 
 @router.post("/{roll_id}/defects", status_code=201)
-def record_defect(roll_id: int, body: DefectIn, db: Db, user: can("qc.write")) -> dict:
+def record_defect(roll_id: int, body: DefectIn, db: Db, user: can["qc.write"]) -> dict:
     defect = qc_svc.record_defect(db, roll_id, defect_type=body.defect_type,
                                   severity=body.severity, location_m=body.location_m,
                                   notes=body.notes, user_id=user.id)

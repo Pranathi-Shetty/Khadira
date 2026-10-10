@@ -1,13 +1,16 @@
 """Authentication, permissions and current-user dependency."""
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import bcrypt
 from fastapi import Cookie, Depends, HTTPException, status
-from jose import JWTError, jwt
-from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from mill.database import get_db
@@ -17,20 +20,74 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "everest-textile-dev-secret-change-in-
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 12   # 12 hours
 
-pwd_context = CryptContext(schemes=["bcrypt", "sha256_crypt"], deprecated="auto")
+
+class JWTError(Exception):
+    pass
+
+
+def _b64url_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+
+def _b64url_decode(s: str) -> bytes:
+    padding = 4 - (len(s) % 4)
+    if padding != 4:
+        s += "=" * padding
+    return base64.urlsafe_b64decode(s.encode("ascii"))
+
+
+class _SimpleJWT:
+    @staticmethod
+    def encode(claims: dict, key: str, algorithm: str = "HS256") -> str:
+        header = {"alg": algorithm, "typ": "JWT"}
+        header_b64 = _b64url_encode(json.dumps(header, separators=(",", ":")).encode("utf-8"))
+        clean_claims = {}
+        for k, v in claims.items():
+            if isinstance(v, datetime):
+                clean_claims[k] = int(v.timestamp())
+            else:
+                clean_claims[k] = v
+        payload_b64 = _b64url_encode(json.dumps(clean_claims, separators=(",", ":")).encode("utf-8"))
+        signing_input = f"{header_b64}.{payload_b64}".encode("utf-8")
+        signature = hmac.new(key.encode("utf-8"), signing_input, hashlib.sha256).digest()
+        sig_b64 = _b64url_encode(signature)
+        return f"{header_b64}.{payload_b64}.{sig_b64}"
+
+    @staticmethod
+    def decode(token: str, key: str, algorithms: list[str] | None = None) -> dict:
+        parts = token.split(".")
+        if len(parts) != 3:
+            raise JWTError("Invalid token segments")
+        header_b64, payload_b64, sig_b64 = parts
+        signing_input = f"{header_b64}.{payload_b64}".encode("utf-8")
+        expected_sig = hmac.new(key.encode("utf-8"), signing_input, hashlib.sha256).digest()
+        actual_sig = _b64url_decode(sig_b64)
+        if not hmac.compare_digest(expected_sig, actual_sig):
+            raise JWTError("Signature verification failed")
+        payload = json.loads(_b64url_decode(payload_b64).decode("utf-8"))
+        if "exp" in payload:
+            if datetime.now(timezone.utc).timestamp() > payload["exp"]:
+                raise JWTError("Token expired")
+        return payload
+
+
+jwt = _SimpleJWT()
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except Exception:
+        return False
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 

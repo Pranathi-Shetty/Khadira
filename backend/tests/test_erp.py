@@ -12,11 +12,21 @@ from sqlalchemy.orm import sessionmaker
 
 from mill.database import Base, get_db
 from mill.auth import hash_password
-from mill.models import (
-    Buyer, Item, ItemType, Machine, MachineType, MachineStatus,
-    StockLevel, StoreLocation, Supplier, User, UserRole,
-    WageBasis, Worker,
-)
+from mill.models import _legacy
+
+Buyer = _legacy.Buyer
+Item = _legacy.Item
+ItemType = _legacy.ItemType
+Machine = _legacy.Machine
+MachineType = _legacy.MachineType
+MachineStatus = _legacy.MachineStatus
+StockLevel = _legacy.StockLevel
+StoreLocation = _legacy.StoreLocation
+Supplier = _legacy.Supplier
+User = _legacy.User
+UserRole = _legacy.UserRole
+WageBasis = _legacy.WageBasis
+Worker = _legacy.Worker
 
 # --- SQLite for tests ---
 TEST_DATABASE_URL = "sqlite:///./test_erp.db"

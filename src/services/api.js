@@ -149,6 +149,56 @@ export const MillAPI = {
     });
   },
 
+  // --- QC Defects ---
+  async reportDefect(rollId, defectType, severity, locationM, notes) {
+    return request(`/qc/defects`, {
+      method: 'POST',
+      body: JSON.stringify({
+        roll_id: rollId,
+        defect_type: defectType,
+        severity,
+        location_m: locationM,
+        notes,
+      }),
+    });
+  },
+
+  async getDefects(rollId) {
+    return request(`/qc/defects/${rollId}`);
+  },
+
+  // --- Notifications ---
+  async getNotifications() {
+    return request('/notifications');
+  },
+
+  async markNotificationRead(notifId) {
+    return request(`/notifications/${notifId}/read`, {
+      method: 'POST',
+    });
+  },
+
+  // --- Production Downtime ---
+  async reportDowntime(machineId, runId, reason, description) {
+    return request(`/production/downtime`, {
+      method: 'POST',
+      body: JSON.stringify({
+        machine_id: machineId,
+        run_id: runId,
+        reason,
+        description,
+      }),
+    });
+  },
+
+  // --- Run Reconciliation ---
+  async finalizeRun(runId, reconciliationData) {
+    return request(`/production/${runId}/finalize`, {
+      method: 'POST',
+      body: JSON.stringify(reconciliationData),
+    });
+  },
+
   // --- Finance & Invoices ---
   async getInvoices() {
     return request('/finance/invoices');

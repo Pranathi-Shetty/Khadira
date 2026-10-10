@@ -44,9 +44,19 @@ def require(permission: str) -> Callable[[User], User]:
     return check
 
 
-def can(permission: str):
-    """Dependency that returns the user if they hold `permission`."""
-    return Annotated[User, Depends(require(permission))]
+class _CanMeta(type):
+    def __getitem__(cls, permission: str):
+        return Annotated[User, Depends(require(permission))]
+
+    def __call__(cls, permission: str):
+        return Annotated[User, Depends(require(permission))]
+
+
+class can(metaclass=_CanMeta):
+    """Dependency that returns the user if they hold `permission`.
+    Supports both can['permission'] (static type checking friendly) and can('permission').
+    """
+    pass
 
 
 class ListParams:

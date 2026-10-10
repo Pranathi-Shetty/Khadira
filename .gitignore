@@ -22,6 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+Odoo nmit - Copy/
 
 # Python & Backend
 venv*
@@ -31,6 +32,9 @@ __pycache__/
 *.db-journal
 *.db-wal
 *.db-shm
+.pytest_cache/
+pytest-cache-files-*/
+scratch_cache/
 .env
 .env.*
 !.env.example

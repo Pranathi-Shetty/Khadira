@@ -34,7 +34,7 @@ def _run_out(r: ProductionRun) -> dict:
 
 
 @router.get("")
-def list_runs(db: Db, _: can("production.read"),
+def list_runs(db: Db, _: can["production.read"],
               status: str | None = None) -> list:
     stmt = select(ProductionRun)
     if status:
@@ -44,7 +44,7 @@ def list_runs(db: Db, _: can("production.read"),
 
 
 @router.post("", status_code=201)
-def start_run(body: RunIn, db: Db, user: can("production.write")) -> dict:
+def start_run(body: RunIn, db: Db, user: can["production.write"]) -> dict:
     run = svc.start_run(db, machine_id=body.machine_id, order_id=body.order_id,
                         item_id=body.item_id, user_id=user.id)
     db.commit()
@@ -53,7 +53,7 @@ def start_run(body: RunIn, db: Db, user: can("production.write")) -> dict:
 
 
 @router.get("/{run_id}")
-def get_run(run_id: int, db: Db, _: can("production.read")) -> dict:
+def get_run(run_id: int, db: Db, _: can["production.read"]) -> dict:
     from ..services.common import DomainError
     r = db.get(ProductionRun, run_id)
     if r is None:
@@ -62,7 +62,7 @@ def get_run(run_id: int, db: Db, _: can("production.read")) -> dict:
 
 
 @router.post("/{run_id}/advance")
-def advance(run_id: int, body: AdvanceIn, db: Db, user: can("production.write")) -> dict:
+def advance(run_id: int, body: AdvanceIn, db: Db, user: can["production.write"]) -> dict:
     run = svc.advance_stage(db, run_id, body.yarn_kg, user.id)
     db.commit()
     return _run_out(run)
@@ -73,7 +73,7 @@ class MaterialIn(BaseModel):
     qty_g: int
 
 @router.post("/{run_id}/materials", status_code=201)
-def issue_material(run_id: int, body: MaterialIn, db: Db, user: can("production.write")) -> dict:
+def issue_material(run_id: int, body: MaterialIn, db: Db, user: can["production.write"]) -> dict:
     rm = svc.issue_material(db, run_id, body.lot_id, body.qty_g, user.id)
     db.commit()
     return {"id": rm.id, "run_id": rm.run_id, "lot_id": rm.lot_id, "issued_g": rm.issued_g}
@@ -103,13 +103,13 @@ def _recon_out(recon):
     }
 
 @router.post("/{run_id}/reconciliation")
-def save_reconciliation(run_id: int, body: ReconciliationIn, db: Db, user: can("production.write")) -> dict:
+def save_reconciliation(run_id: int, body: ReconciliationIn, db: Db, user: can["production.write"]) -> dict:
     recon = svc.save_reconciliation(db, run_id, body.model_dump(exclude_unset=True), user.id)
     db.commit()
     return _recon_out(recon)
 
 @router.post("/{run_id}/reconciliation/finalize")
-def finalize_reconciliation(run_id: int, db: Db, user: can("production.write")) -> dict:
+def finalize_reconciliation(run_id: int, db: Db, user: can["production.write"]) -> dict:
     recon = svc.finalize_reconciliation(db, run_id, user.id)
     db.commit()
     return _recon_out(recon)

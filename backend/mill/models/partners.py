@@ -22,6 +22,7 @@ class Supplier(Base):
     email: Mapped[str | None] = mapped_column(String(200))
     address: Mapped[str | None] = mapped_column(Text)
     gstin: Mapped[str | None] = mapped_column(String(20))
+    payment_terms_days: Mapped[int | None] = mapped_column(Integer, default=30)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
@@ -37,5 +38,6 @@ class Buyer(Base):
     address: Mapped[str | None] = mapped_column(Text)
     gstin: Mapped[str | None] = mapped_column(String(20))
     credit_days: Mapped[int] = mapped_column(Integer, default=30)
+    payment_terms_days: Mapped[int | None] = mapped_column(Integer, default=30)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

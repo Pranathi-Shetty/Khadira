@@ -55,6 +55,8 @@ class ProductionRun(Base):
     order: Mapped[Order | None] = relationship()
     item: Mapped[Item] = relationship()
     rolls: Mapped[list["Roll"]] = relationship(back_populates="run", cascade="all, delete-orphan")
+    materials: Mapped[list["RunMaterial"]] = relationship(back_populates="run", cascade="all, delete-orphan")
+    reconciliation: Mapped["RunReconciliation | None"] = relationship(back_populates="run", uselist=False, cascade="all, delete-orphan")
 
 
 class Roll(Base):
