@@ -1,10 +1,10 @@
-# 🏭 Everest Textile Mills ERP
+# 🏭 Khadira Textile Mills ERP
 
 ![Status](https://img.shields.io/badge/Status-MVP_Complete-green)
 ![Backend](https://img.shields.io/badge/Backend-FastAPI-009688)
 ![Frontend](https://img.shields.io/badge/Frontend-Next.js_15-000000)
 
-A unified, high-performance ERP system designed specifically for Everest Textile Mills. This platform replaces notebooks, paper slips, and phone calls with a single digital backbone that connects the floor to the front office.
+A unified, high-performance ERP system designed specifically for Khadira Textile Mills. This platform replaces notebooks, paper slips, and phone calls with a single digital backbone that connects the floor to the front office.
 
 ## 🏗️ Architecture
 

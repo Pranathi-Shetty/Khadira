@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Everest Textile Mills ERP",
-  description: "Unified ERP for Everest Textile Mills",
+  title: "Khadira | Textile Mills",
+  description: "Unified ERP for Khadira Textile Mills",
 };
 
 export default function RootLayout({

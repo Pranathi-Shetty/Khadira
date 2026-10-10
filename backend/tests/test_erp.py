@@ -1,5 +1,5 @@
 """
-Test suite for Everest Textile Mills ERP.
+Test suite for Khadira Textile Mills ERP.
 Covers the full day-in-the-mill flow plus the A/C/P/I test plan from the execution plan.
 
 Run: pytest tests/ -v
@@ -137,7 +137,7 @@ def auth_headers(client, username="admin", password="admin123"):
 def test_health(client):
     r = client.get("/api/health")
     assert r.status_code == 200
-    assert r.json()["mill"] == "Everest Textile Mills"
+    assert r.json()["mill"] == "Khadira Textile Mills"
 
 
 def test_login_success(client):

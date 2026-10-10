@@ -1,0 +1,118 @@
+"""Production service: runs, stage transitions, roll creation."""
+
+from datetime import datetime, timezone
+
+from sqlalchemy.orm import Session
+
+from ..models import Location, Machine, ProductionRun, Roll, RollEvent
+from ..models.production import MACHINE_STAGES
+from .common import DomainError, audit
+from .inventory import post_move
+
+
+def start_run(db: Session, *, machine_id: int, order_id: int | None,
+              item_id: int, user_id: int | None) -> ProductionRun:
+    machine = db.get(Machine, machine_id)
+    if machine is None:
+        raise DomainError("Machine not found.", 404)
+    stages = MACHINE_STAGES.get(machine.machine_type)
+    if not stages:
+        raise DomainError(f"Unknown machine type '{machine.machine_type}'.")
+    run = ProductionRun(
+        machine_id=machine_id,
+        order_id=order_id,
+        item_id=item_id,
+        current_stage=stages[0],
+        status="active",
+    )
+    db.add(run)
+    db.flush()
+    if order_id:
+        from ..models import Order
+        order = db.get(Order, order_id)
+        if order and order.status == "confirmed":
+            order.status = "in_production"
+    audit(db, entity="ProductionRun", entity_id=run.id, action="start", user_id=user_id)
+    return run
+
+
+def advance_stage(db: Session, run_id: int, yarn_kg: float | None,
+                  user_id: int | None) -> ProductionRun:
+    run = db.get(ProductionRun, run_id)
+    if run is None:
+        raise DomainError("Production run not found.", 404)
+    if run.status != "active":
+        raise DomainError("Run is not active.")
+
+    machine = db.get(Machine, run.machine_id)
+    stages = MACHINE_STAGES.get(machine.machine_type, [])
+    idx = stages.index(run.current_stage)
+
+    # Consume yarn if provided
+    if yarn_kg and yarn_kg > 0:
+        yarn_g = int(yarn_kg * 1000)
+        run.yarn_used_g = (run.yarn_used_g or 0) + yarn_g
+        # Deduct from RAW location
+        from sqlalchemy import select
+        from ..models import StockLevel
+        loc = db.scalar(select(Location).where(Location.code == "RAW"))
+        if loc:
+            levels = db.scalars(
+                select(StockLevel).where(
+                    StockLevel.location_id == loc.id,
+                    StockLevel.qty_g > 0,
+                )
+            ).all()
+            remaining = yarn_g
+            for level in levels:
+                if remaining <= 0:
+                    break
+                take = min(level.qty_g, remaining)
+                post_move(db, item_id=level.item_id, location_id=loc.id,
+                          delta_g=-take, ref=f"RUN-{run.id}", note="yarn consumed")
+                remaining -= take
+
+    if idx + 1 >= len(stages):
+        # Final stage complete
+        run.status = "completed"
+        run.completed_at = datetime.now(timezone.utc)
+        if run.order_id:
+            from ..models import Order
+            order = db.get(Order, run.order_id)
+            if order:
+                order.status = "completed"
+    else:
+        run.current_stage = stages[idx + 1]
+
+    audit(db, entity="ProductionRun", entity_id=run.id, action="advance_stage", user_id=user_id)
+    return run
+
+
+def create_roll(db: Session, *, run_id: int, length_cm: int,
+                weight_g: int | None, user_id: int | None) -> Roll:
+    run = db.get(ProductionRun, run_id)
+    if run is None:
+        raise DomainError("Production run not found.", 404)
+
+    machine = db.get(Machine, run.machine_id)
+    stages = MACHINE_STAGES.get(machine.machine_type, [])
+    if run.current_stage != stages[-1] and run.status != "completed":
+        raise DomainError("Rolls can only be created at the final production stage.")
+
+    from sqlalchemy import func, select
+    count = db.scalar(select(func.count()).select_from(Roll)) or 0
+    roll_number = f"ROLL-{count + 1:06d}"
+
+    roll = Roll(
+        roll_number=roll_number,
+        run_id=run_id,
+        item_id=run.item_id,
+        length_cm=length_cm,
+        weight_g=weight_g,
+        status="awaiting_qc",
+    )
+    db.add(roll)
+    db.flush()
+    db.add(RollEvent(roll_id=roll.id, event_type="created", created_by_id=user_id))
+    audit(db, entity="Roll", entity_id=roll.id, action="create", user_id=user_id)
+    return roll

@@ -1,4 +1,4 @@
-# Business Rules — Everest Textile Mills ERP (MVP)
+# Business Rules — Khadira Textile Mills ERP (MVP)
 
 Approved defaults for the first implementation phase.
 

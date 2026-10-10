@@ -1,1 +1,1 @@
-# mill package
+"""Khadira ERP package."""
