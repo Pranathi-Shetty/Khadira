@@ -1,30 +1,46 @@
-# Textile Mill ERP Backend Overview
+# Backend Overview
 
-## The Story
-The team started from a retail shop ERP, which is built around buying finished products and selling them. A textile mill works differently: it buys raw yarn, runs it through machines, produces fabric rolls, checks them, stores them and ships them. So everything retail-specific (loyalty points, POS, promotions, product categories) was removed and replaced with mill concepts.
+Khadira is being developed as a unified textile-mill operations platform. This repository currently contains its API backend, not a browser interface. The API connects core records for purchasing, inventory, customer orders, production, quality inspection, dispatch, and finance. Attendance and payroll rules are documented separately but are not implemented as API workflows.
 
-## How the Code is Organised
-Three layers, each with one job:
+## Code organization
 
-- `models/`: defines the data (tables for items, orders, machines, rolls, invoices).
-- `services/`: holds the rules (what’s allowed and what isn’t).
-- `api/`: is the set of endpoints that the outside world calls.
+- `backend/mill/models/` defines database entities and relationships.
+- `backend/mill/services/` contains business rules and workflow operations.
+- `backend/mill/api/` exposes the workflows through FastAPI routes.
+- `backend/migrations/` contains Alembic schema migrations.
+- `backend/tests/` contains API and workflow tests.
+- `backend/mill/seed.py` creates local demo data in SQLite.
 
-Plus a few support files: login and sessions, a permissions file for who can do what, a seed file for demo data, and migrations for the database structure.
+## Main workflows
 
-## The Five Workflows
+### Purchasing and inventory
 
-1. **Stock:** Yarn quantities are never edited directly. Every change is written as a ledger entry (received, issued to production, fabric in, fabric out), so there’s always a history. Yarn is stored in grams as whole numbers to avoid decimal rounding errors, and stock can’t go below zero. There are two fixed stores: `RAW` for yarn and `FIN` for finished fabric.
-2. **Yarn arrives:** The store keeper creates a purchase order. When the truck arrives, receiving it creates a receipt and a yarn lot (e.g. `LOT-2026-00001`), and adds the yarn to `RAW`. Every later roll points back to its lot, so you can say which supplier’s yarn went into which roll.
-3. **Order and yarn check:** Office staff create a buyer order in meters. Before it can be confirmed, the system works out the yarn needed (meters x the fabric’s yarn per meter x 1000 for grams) and compares it with the stock in `RAW`. If there isn’t enough, confirmation is refused with an “insufficient yarn” error.
-4. **Production and rolls:** The supervisor assigns the order to a machine and starts a run. As it moves through the stages, yarn is taken out of stock. At the last stage the rolls are registered, each with its own number (`ROLL-000001`, `ROLL-000002`) and starting status awaiting QC. The QC inspector then passes (and the roll goes into the `FIN` store), sends for rework, or rejects it, and a rejected roll can never be sold.
-5. **Dispatch and invoice:** The store keeper picks rolls for a buyer and enters the vehicle and driver details. On confirmation, the rolls become dispatched, finished stock goes down, and an invoice is generated automatically from the meters shipped. A database rule says a roll can appear in only one dispatch, which is the double-dispatch protection.
+Users create supplier purchase orders and record receipts against purchase-order lines. A receipt records a yarn lot and posts stock movements. Inventory is maintained by item and location; yarn quantities use grams, and stock updates reject changes that would make a quantity negative. The current `Roll` model does not reference a yarn lot, so the API does not provide end-to-end lot-to-roll traceability.
 
-## Security
-Six roles (admin, owner, store, floor supervisor, QC, office), and every endpoint checks the role first. Login uses hashed passwords and a secure session cookie.
+### Buyer orders
 
-## Key Verifications
-- QC statuses are strictly: `pass`, `rework`, and `reject`.
-- The yarn check happens when an order is confirmed.
-- Roll QR labels exist.
-- The uniqueness rule on dispatched rolls is actively enforced.
+Orders contain fabric items. When an order is confirmed, the service estimates required yarn from the fabric's yarn-per-metre value and the order quantity, then compares it with available yarn stock. An order is rejected if the estimate exceeds stock.
+
+### Production and quality
+
+Production runs are assigned to a machine and move through the configured stages for that machine type. Advancing a run can record yarn consumption as stock movements. Rolls can be created at the final stage and start with `awaiting_qc` status. Inspection verdicts are `passed`, `failed`, or `held`; a passed roll can then be moved into finished-goods stock.
+
+### Dispatch and finance
+
+Dispatch accepts rolls that are already in store, deducts their lengths from finished-goods stock, and marks them `dispatched`. The dispatch endpoint does **not** create an invoice automatically. Invoices are created separately through the finance API, where sale or purchase invoices and invoice payments are recorded.
+
+## Access and health
+
+Business routes use the permission checks in `backend/mill/api/deps.py`. Login creates a session cookie; its `Secure` attribute is controlled by configuration, so local development defaults should not be treated as deployment security settings. The root and `/api/health` routes are public; the health route checks whether the configured database accepts a query.
+
+The seeded roles are `admin`, `owner`, `store`, `floor_supervisor`, `qc`, and `office`. Seeded accounts use a shared development password and must only be used locally.
+
+## Current scope and gaps
+
+- The repository is API-only; a browser frontend is not included.
+- Attendance and wage/payroll processing are not implemented.
+- Roll QR labels are not implemented.
+- Yarn lots are recorded at receipt, but rolls are not linked back to those lots.
+- Dispatch and invoice creation are separate operations.
+
+See [business rules](business-rules.md) for the broader workflow rules and planned behavior. That document includes rules that are not yet implemented in the API.
