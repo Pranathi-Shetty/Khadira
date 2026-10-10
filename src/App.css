@@ -2651,8 +2651,13 @@
    ===================================================================== */
 .mill-dashboard-view {
   min-height: 100vh;
-  background-color: #060606;
-  color: #f7f5f0;
+  background-color: var(--bg-page, #F7F3EC);
+  background-image: 
+    linear-gradient(rgba(247, 243, 236, 0.5), rgba(247, 243, 236, 0.5)),
+    url('/assets/images/dashboard-damask-bg.jpg');
+  background-repeat: repeat;
+  background-size: 380px auto;
+  color: var(--text-main, #1E293B);
   font-family: var(--font-sans);
   position: relative;
   display: flex;
