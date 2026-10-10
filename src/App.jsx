@@ -387,6 +387,73 @@ const YARN_DONUT_DATA = [
   { label: 'Others', pct: 3, color: '#94A3B8', strokeDash: '13 427', strokeOffset: '-427' },
 ];
 
+// Status & QC Visual Rendering Helpers
+export const renderOrderStatusBadge = (status) => {
+  const s = (status || 'draft').toLowerCase();
+  const config = {
+    draft: { label: 'Draft', class: 'status-draft', dot: '#71717a' },
+    confirmed: { label: 'Confirmed', class: 'status-confirmed', dot: '#0284c7' },
+    in_production: { label: 'In Production', class: 'status-in_production', dot: '#f59e0b', pulse: true },
+    qc: { label: 'QC Review', class: 'status-qc', dot: '#8b5cf6' },
+    ready: { label: 'Ready to Ship', class: 'status-ready', dot: '#0891b2' },
+    in_store: { label: 'In Store', class: 'status-in_store', dot: '#0891b2' },
+    dispatched: { label: 'Dispatched', class: 'status-dispatched', dot: '#059669' },
+    completed: { label: 'Completed', class: 'status-completed', dot: '#059669' },
+    cancelled: { label: 'Cancelled', class: 'status-cancelled', dot: '#dc2626' },
+  }[s] || { label: status, class: 'status-draft', dot: '#71717a' };
+
+  return (
+    <span className={`erp-badge ${config.class}`}>
+      <span className={`erp-status-dot ${config.pulse ? 'erp-pulse' : ''}`} style={{ backgroundColor: config.dot }} />
+      {config.label}
+    </span>
+  );
+};
+
+export const renderQCGradeBadge = (grade) => {
+  if (!grade) {
+    return (
+      <span className="erp-badge grade-badge-none">
+        <span className="erp-status-dot" style={{ backgroundColor: '#94a3b8' }} />
+        Pending Grade
+      </span>
+    );
+  }
+  const g = String(grade).replace(/^Grade\s+/i, '').trim().toUpperCase();
+  const config = {
+    A: { class: 'grade-badge-a', label: 'Grade A (Export)', dot: '#047857' },
+    B: { class: 'grade-badge-b', label: 'Grade B (Commercial)', dot: '#b45309' },
+    C: { class: 'grade-badge-c', label: 'Grade C (Seconds)', dot: '#b91c1c' },
+  }[g] || { class: 'grade-badge-b', label: `Grade ${g}`, dot: '#b45309' };
+
+  return (
+    <span className={`erp-badge ${config.class}`}>
+      <span className="erp-status-dot" style={{ backgroundColor: config.dot }} />
+      {config.label}
+    </span>
+  );
+};
+
+export const renderRollStatusBadge = (status) => {
+  const s = (status || 'awaiting_qc').toLowerCase();
+  const config = {
+    awaiting_qc: { label: 'Awaiting QC', class: 'qc-status-awaiting_qc', dot: '#2563eb' },
+    passed: { label: 'Passed Inspection', class: 'qc-status-passed', dot: '#059669' },
+    rework: { label: 'Rework Required', class: 'qc-status-rework', dot: '#d97706' },
+    rejected: { label: 'Rejected Defect', class: 'qc-status-rejected', dot: '#dc2626' },
+    in_store: { label: 'In Store (FIN)', class: 'qc-status-in_store', dot: '#0891b2' },
+    dispatched: { label: 'Dispatched', class: 'qc-status-dispatched', dot: '#047857' },
+    produced: { label: 'Fresh Off Loom', class: 'qc-status-produced', dot: '#4f46e5' },
+  }[s] || { label: status, class: 'qc-status-awaiting_qc', dot: '#64748b' };
+
+  return (
+    <span className={`erp-badge ${config.class}`}>
+      <span className="erp-status-dot" style={{ backgroundColor: config.dot }} />
+      {config.label}
+    </span>
+  );
+};
+
 export default function App() {
   // Navigation & Header
   const [scrolled, setScrolled] = useState(false);
@@ -559,10 +626,10 @@ export default function App() {
     try {
       const [dashRes, itemsRes, machinesRes, ordersRes, rollsRes, runsRes, invRes, poRes, supRes, buyRes, qcRes] = await Promise.allSettled([
         MillAPI.getDashboard(),
-        MillAPI.getItems(),
+        MillAPI.getItems(null, '', { all: true }),
         MillAPI.getMachines(),
-        MillAPI.getOrders(),
-        MillAPI.getRolls(),
+        MillAPI.getOrders(null, '', { all: true }),
+        MillAPI.getRolls(null, { all: true }),
         MillAPI.getProductionRuns(),
         MillAPI.getInvoices(),
         MillAPI.getPurchasing(),
@@ -2281,9 +2348,7 @@ export default function App() {
                                         <td className="tabular-nums">{meters.toLocaleString()} m</td>
                                         <td className="tabular-nums">₹{rate}</td>
                                         <td>
-                                          <span className={`erp-badge status-${(ord.status || 'draft').toLowerCase()}`}>
-                                            {ord.status || 'draft'}
-                                          </span>
+                                          {renderOrderStatusBadge(ord.status)}
                                         </td>
                                         <td>
                                           {ord.status === 'draft' ? (
@@ -2491,12 +2556,10 @@ export default function App() {
                                     <td className="tabular-nums">{r.length_m || '-'} m</td>
                                     <td className="tabular-nums">{r.weight_g ? (r.weight_g / 1000).toFixed(1) : '-'} kg</td>
                                     <td>
-                                      <span className="erp-badge status-passed">{r.qc_grade || 'Grade A'}</span>
+                                      {renderQCGradeBadge(r.qc_grade)}
                                     </td>
                                     <td>
-                                      <span className={`erp-badge status-${(r.status || 'produced').toLowerCase()}`}>
-                                        {r.status || 'produced'}
-                                      </span>
+                                      {renderRollStatusBadge(r.status)}
                                     </td>
                                     <td>
                                       <button
@@ -2520,8 +2583,8 @@ export default function App() {
                                     <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{r.no}</td>
                                     <td className="tabular-nums">{r.m}</td>
                                     <td className="tabular-nums">{r.w}</td>
-                                    <td><span className="erp-badge status-passed">{r.gr}</span></td>
-                                    <td><span className={`erp-badge status-${r.st}`}>{r.st}</span></td>
+                                    <td>{renderQCGradeBadge(r.gr)}</td>
+                                    <td>{renderRollStatusBadge(r.st)}</td>
                                     <td>
                                       <button
                                         type="button"

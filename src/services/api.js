@@ -46,6 +46,72 @@ export async function apiRequest(endpoint, options = {}) {
   }
 }
 
+/**
+ * Automatically retrieves all paginated records from an endpoint by requesting
+ * sequential pages until all items are fetched.
+ * Supports paginated envelope responses ({ items, total, page, page_size })
+ * as well as direct array responses.
+ */
+export async function requestAllPages(resource, params = {}, options = {}) {
+  const pageSize = Number(params.page_size || options.pageSize || 100);
+  let currentPage = Number(params.page || 1);
+  const maxPages = Number(options.maxPages || 50);
+
+  const baseParams = { ...params };
+  delete baseParams.page;
+  delete baseParams.page_size;
+
+  const allItems = [];
+  let totalCount = 0;
+  let pageCount = 0;
+
+  while (pageCount < maxPages) {
+    pageCount += 1;
+    const searchParams = new URLSearchParams();
+    Object.entries({ ...baseParams, page: currentPage, page_size: pageSize }).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        searchParams.append(k, String(v));
+      }
+    });
+
+    const res = await apiRequest(`/${resource}?${searchParams.toString()}`);
+
+    // If API returns a flat array directly
+    if (Array.isArray(res)) {
+      return {
+        items: res,
+        total: res.length,
+        page: 1,
+        page_size: res.length,
+        pages: 1,
+      };
+    }
+
+    // Standard paginated envelope ({ items: [...], total, page, page_size })
+    if (res && Array.isArray(res.items)) {
+      allItems.push(...res.items);
+      totalCount = typeof res.total === 'number' ? res.total : allItems.length;
+
+      // Stop condition: reached total or returned empty / partial final page
+      if (allItems.length >= totalCount || res.items.length < pageSize || res.items.length === 0) {
+        break;
+      }
+      currentPage += 1;
+    } else {
+      // Non-array and non-paginated object
+      return res;
+    }
+  }
+
+  return {
+    items: allItems,
+    total: totalCount || allItems.length,
+    page: 1,
+    page_size: allItems.length,
+    pages: pageCount,
+  };
+}
+
 // Typed generic CRUD helpers
 export const apiClient = {
   async getList(resource, params = {}) {
@@ -58,6 +124,8 @@ export const apiClient = {
     const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
     return apiRequest(`/${resource}${query}`);
   },
+
+  requestAllPages,
 
   async getById(resource, id) {
     return apiRequest(`/${resource}/${id}`);
@@ -87,6 +155,7 @@ export const apiClient = {
 export const MillAPI = {
   // Generic CRUD pass-through
   getList: apiClient.getList,
+  requestAllPages,
   getById: apiClient.getById,
   create: apiClient.create,
   update: apiClient.update,
@@ -127,11 +196,18 @@ export const MillAPI = {
   },
 
   // --- Inventory & Items ---
-  async getItems(itemType = null, q = '') {
+  async getItems(itemType = null, q = '', options = {}) {
     const params = {};
     if (itemType) params.item_type = itemType;
     if (q) params.q = q;
+    if (options.all) {
+      return requestAllPages('items', params, options);
+    }
     return apiClient.getList('items', params);
+  },
+
+  async getAllItems(itemType = null, q = '') {
+    return requestAllPages('items', { ...(itemType ? { item_type: itemType } : {}), ...(q ? { q } : {}) });
   },
 
   async createItem(itemData) {
@@ -155,11 +231,18 @@ export const MillAPI = {
   },
 
   // --- Sales Orders ---
-  async getOrders(status = null, q = '') {
+  async getOrders(status = null, q = '', options = {}) {
     const params = {};
     if (status) params.status = status;
     if (q) params.q = q;
+    if (options.all) {
+      return requestAllPages('orders', params, options);
+    }
     return apiClient.getList('orders', params);
+  },
+
+  async getAllOrders(status = null, q = '') {
+    return requestAllPages('orders', { ...(status ? { status } : {}), ...(q ? { q } : {}) });
   },
 
   async createOrder(orderData) {
@@ -199,13 +282,38 @@ export const MillAPI = {
   },
 
   // --- Fabric Rolls & Quality Control ---
-  async getRolls(status = null) {
+  async getRolls(status = null, options = {}) {
     const params = status ? { status } : {};
+    if (options.all) {
+      return requestAllPages('rolls', params, options);
+    }
     return apiClient.getList('rolls', params);
+  },
+
+  async getAllRolls(status = null) {
+    return requestAllPages('rolls', status ? { status } : {});
   },
 
   async getPendingQC() {
     return apiRequest('/qc/pending');
+  },
+
+  // --- Attendance, Wages & Costing (Demonstration) ---
+  async getWorkers() {
+    return apiClient.getList('workers').catch(() => ({ items: [] }));
+  },
+
+  async getAttendance(params = {}) {
+    return apiClient.getList('attendance', params).catch(() => ({ items: [] }));
+  },
+
+  async getWageRuns(params = {}) {
+    return apiClient.getList('wage-runs', params).catch(() => ({ items: [] }));
+  },
+
+  async getCostingSummary(orderId = null) {
+    const endpoint = orderId ? `/reports/costing?order_id=${orderId}` : '/reports/costing';
+    return apiRequest(endpoint).catch(() => null);
   },
 
   async inspectRoll(rollId, verdict, grade = 'A', note = '') {

@@ -33,6 +33,7 @@ __pycache__/
 *.db-journal
 *.db-wal
 *.db-shm
+!backend/mill_demo.db
 .pytest_cache/
 pytest-cache-files-*/
 scratch_cache/
