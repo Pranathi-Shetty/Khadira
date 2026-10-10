@@ -23,11 +23,19 @@ ROLES: dict[str, dict] = {
     "floor_supervisor": {
         "label": "Floor Supervisor",
         "permissions": [
-            "items.read",
-            "machines.read",
+            "items.read", "items.write",
+            "machines.read", "machines.write",
             "production.read", "production.write",
             "rolls.read", "rolls.write",
+            "orders.read", "orders.write",
+            "purchasing.read", "purchasing.write",
+            "partners.read", "partners.write",
+            "inventory.read", "inventory.write",
+            "qc.read", "qc.write",
+            "finance.read", "finance.write",
+            "dispatch.read", "dispatch.write",
             "reports.read",
+            "settings.read",
         ],
     },
     "qc": {

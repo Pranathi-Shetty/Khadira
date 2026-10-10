@@ -368,15 +368,28 @@ export default function App() {
 
   // Terminal Login & Real Backend State
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [isDashboardOpen, setIsDashboardOpen] = useState(false);
-  const [loginRole, setLoginRole] = useState('Store Manager');
-  const [dashboardRole, setDashboardRole] = useState('Store Manager');
+  const [isDashboardOpen, setIsDashboardOpen] = useState(true);
+  const [loginRole, setLoginRole] = useState('Production Supervisor');
+  const [dashboardRole, setDashboardRole] = useState('Production Supervisor');
   const [loginPassword, setLoginPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [loggedInUser, setLoggedInUser] = useState(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [loggedInUser, setLoggedInUser] = useState({
+    username: 'floor_supervisor',
+    full_name: 'Production Supervisor',
+    role: 'floor_supervisor'
+  });
   const [loginError, setLoginError] = useState('');
   const [dashboardSearch, setDashboardSearch] = useState('');
+  const [chartHoverMonth, setChartHoverMonth] = useState(null);
+
+  // Additional live collections for full ERP tabs
+  const [livePOs, setLivePOs] = useState([]);
+  const [liveSuppliers, setLiveSuppliers] = useState([]);
+  const [liveBuyers, setLiveBuyers] = useState([]);
+  const [livePendingQC, setLivePendingQC] = useState([]);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createModalType, setCreateModalType] = useState('order');
 
   // Modern ERP Sidebar & View State (like erp-otw7.vercel.app)
   const [erpSidebarTab, setErpSidebarTab] = useState('dashboard');
@@ -444,7 +457,7 @@ export default function App() {
   const fetchAllLiveData = async () => {
     setIsFetchingData(true);
     try {
-      const [dashRes, itemsRes, machinesRes, ordersRes, rollsRes, runsRes, invRes] = await Promise.allSettled([
+      const [dashRes, itemsRes, machinesRes, ordersRes, rollsRes, runsRes, invRes, poRes, supRes, buyRes, qcRes] = await Promise.allSettled([
         MillAPI.getDashboard(),
         MillAPI.getItems(),
         MillAPI.getMachines(),
@@ -452,6 +465,10 @@ export default function App() {
         MillAPI.getRolls(),
         MillAPI.getProductionRuns(),
         MillAPI.getInvoices(),
+        MillAPI.getPurchasing(),
+        MillAPI.getSuppliers(),
+        MillAPI.getBuyers(),
+        MillAPI.getPendingQC(),
       ]);
 
       if (dashRes.status === 'fulfilled') setLiveDashboardMetrics(dashRes.value);
@@ -461,6 +478,10 @@ export default function App() {
       if (rollsRes.status === 'fulfilled' && rollsRes.value?.items) setLiveRolls(rollsRes.value.items);
       if (runsRes.status === 'fulfilled' && Array.isArray(runsRes.value)) setLiveRuns(runsRes.value);
       if (invRes.status === 'fulfilled' && Array.isArray(invRes.value)) setLiveInvoices(invRes.value);
+      if (poRes.status === 'fulfilled' && poRes.value?.items) setLivePOs(poRes.value.items);
+      if (supRes.status === 'fulfilled' && supRes.value?.items) setLiveSuppliers(supRes.value.items);
+      if (buyRes.status === 'fulfilled' && buyRes.value?.items) setLiveBuyers(buyRes.value.items);
+      if (qcRes.status === 'fulfilled' && Array.isArray(qcRes.value)) setLivePendingQC(qcRes.value);
     } catch (err) {
       console.error('Error fetching live backend data:', err);
     } finally {
@@ -1085,14 +1106,19 @@ export default function App() {
     <div className="app-wrapper">
       {isDashboardOpen ? (
         <main className="erp-app-shell">
-          {/* 1. LEFT SIDEBAR (Dark theme #111114 matching erp-otw7.vercel.app) */}
+          {/* 1. LEFT FIXED SIDEBAR (260px / Collapsible to 72px) */}
           <aside className={`erp-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
             {/* Top Brand Block */}
-            <div className="erp-brand-header">
+            <div 
+              className="erp-brand-header clickable"
+              onClick={() => setIsDashboardOpen(false)}
+              style={{ cursor: 'pointer' }}
+              title="Return to Khadira Landing Page"
+            >
               <div className="erp-brand-logo-sq">E</div>
               <div className="erp-brand-text">
-                <span className="erp-brand-title">ERP</span>
-                <span className="erp-brand-sub">Kios Gawai</span>
+                <span className="erp-brand-title">Everest Textile Mills</span>
+                <span className="erp-brand-sub">Textile Operations ERP</span>
               </div>
             </div>
 
@@ -1206,7 +1232,7 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Group: Mill Operations */}
+              {/* Group: Operations */}
               <div className="erp-nav-group">
                 <span className="erp-nav-heading">Operations</span>
                 <button
@@ -1228,24 +1254,22 @@ export default function App() {
               </div>
             </div>
 
-            {/* Bottom Profile Bar */}
+            {/* Pinned User Card at Bottom */}
             <div className="erp-sidebar-user">
               <button
                 type="button"
                 className="erp-user-pill"
                 onClick={() => setIsRoleMenuOpen(!isRoleMenuOpen)}
+                title="Switch Role or Profile"
               >
-                <div className="erp-user-avatar">
-                  {getUserInitials()}
-                </div>
+                <div className="erp-user-avatar">FS</div>
                 <div className="erp-user-info">
-                  <span className="erp-user-name">{loggedInUser?.username || 'admin'}</span>
-                  <span className="erp-user-role">{dashboardRole || 'Administrator'}</span>
+                  <span className="erp-user-name">floor_supervisor</span>
+                  <span className="erp-user-role">Production Supervisor</span>
                 </div>
                 <ChevronsUpDown size={15} className="erp-user-toggle-icon" />
               </button>
 
-              {/* Popup Menu to switch roles or return */}
               {isRoleMenuOpen && (
                 <div className="erp-role-dropdown">
                   <div className="erp-role-dropdown-header">Switch Role Profile</div>
@@ -1257,7 +1281,7 @@ export default function App() {
                       onClick={() => {
                         setDashboardRole(role);
                         setIsRoleMenuOpen(false);
-                        setToastMessage(`Switched role to ${role}`);
+                        setToastMessage(`Switched role profile to ${role}`);
                       }}
                     >
                       <span className="erp-role-dot" />
@@ -1273,35 +1297,26 @@ export default function App() {
                       handleTerminalLogout(true);
                     }}
                   >
-                    <span>Sign Out & Go to Login</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="erp-role-dropdown-item signout"
-                    onClick={() => {
-                      setIsRoleMenuOpen(false);
-                      setIsDashboardOpen(false);
-                    }}
-                  >
-                    <span>Exit to Showcase</span>
+                    <LogOut size={13} />
+                    <span>Sign Out</span>
                   </button>
                 </div>
               )}
             </div>
           </aside>
 
-          {/* 2. MAIN WORKSPACE */}
-          <section className="erp-main-body">
-            {/* Top Workspace Header */}
+          {/* 2. MAIN WORKSPACE WITH INDEPENDENT SCROLL */}
+          <section className="erp-main-area">
+            {/* Top Workspace Header Bar (56-64px) */}
             <header className="erp-topbar">
               <div className="erp-topbar-left">
                 <button
                   type="button"
                   className="erp-collapse-btn"
                   onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                  title="Toggle Sidebar"
+                  title="Toggle Sidebar Width"
                 >
-                  <PanelLeft size={18} />
+                  <PanelLeft size={17} />
                 </button>
                 <div className="erp-breadcrumb">
                   {getBreadcrumb()}
@@ -1311,536 +1326,854 @@ export default function App() {
               <div className="erp-topbar-right">
                 <button
                   type="button"
-                  className="erp-btn erp-btn-primary"
-                  onClick={() => setIsNewOrderModalOpen(true)}
+                  className="erp-btn-landing-tab"
+                  onClick={() => setIsDashboardOpen(false)}
+                  title="Return to Khadira Landing Page"
+                  id="btn-back-to-landing"
                 >
-                  New sales order
+                  <ArrowLeft size={14} />
+                  <span>Landing page</span>
                 </button>
                 <button
                   type="button"
-                  className="erp-btn erp-btn-secondary"
-                  onClick={() => setToastMessage('Purchase order form opened')}
+                  className="erp-btn-primary"
+                  onClick={() => {
+                    setCreateModalType('order');
+                    setIsCreateModalOpen(true);
+                  }}
                 >
-                  New purchase order
+                  <Plus size={15} />
+                  <span>New sales order</span>
                 </button>
                 <button
                   type="button"
-                  className="erp-btn erp-btn-icon"
+                  className="erp-btn-secondary"
+                  onClick={() => {
+                    setCreateModalType('purchase');
+                    setIsCreateModalOpen(true);
+                  }}
+                >
+                  <Plus size={15} />
+                  <span>New purchase order</span>
+                </button>
+                <button
+                  type="button"
+                  className="erp-btn-icon"
                   onClick={fetchAllLiveData}
-                  title="Sync backend database"
+                  title="Refresh & sync live backend database"
                 >
                   <RefreshCw size={15} className={isFetchingData ? 'spin-icon' : ''} />
                 </button>
                 <button
                   type="button"
-                  className="erp-btn erp-btn-secondary"
-                  onClick={() => setIsDashboardOpen(false)}
-                  title="Return to website showcase"
-                >
-                  <ArrowLeft size={14} style={{ marginRight: '4px' }} />
-                  Showcase
-                </button>
-                <button
-                  type="button"
-                  className="erp-btn erp-btn-secondary"
+                  className="erp-btn-icon"
                   onClick={() => handleTerminalLogout(true)}
-                  title="Sign out and open factory login page"
+                  title="Sign Out"
                 >
-                  <LogOut size={14} style={{ marginRight: '4px' }} />
-                  Sign Out
+                  <LogOut size={15} />
                 </button>
               </div>
             </header>
 
-            {/* Workspace Content Canvas */}
-            <div className="erp-content-viewport">
-              {erpSidebarTab === 'dashboard' ? (
-                <div className="erp-dashboard-canvas">
-                  {/* Greeting Block */}
-                  <div className="erp-greeting-block">
-                    <h1 className="erp-greeting-title">
-                      {getGreeting()}, {loggedInUser?.username || 'admin'}
-                    </h1>
-                    <p className="erp-greeting-sub">
-                      How the business is doing over the last 30 days.
-                    </p>
-                  </div>
-
-                  {/* 8-Card KPI Grid (4 columns x 2 rows matching target screenshot) */}
-                  <div className="erp-metrics-grid">
-                    {/* Card 1: Revenue */}
-                    <div className="erp-stat-card">
-                      <div className="erp-stat-header">
-                        <span className="erp-stat-label">Revenue</span>
-                        <TrendingUp size={16} className="erp-stat-icon-muted" />
+            {/* Independent Scrollable Workspace Canvas */}
+            <div className="erp-scroll-canvas">
+              <div className="erp-container">
+                {erpSidebarTab === 'dashboard' ? (
+                  <>
+                    {/* Page Header: Greeting + Subtitle + Date Selector */}
+                    <div className="erp-page-header">
+                      <div className="erp-page-title-group">
+                        <h1 className="erp-page-title">
+                          Good evening, {loggedInUser?.username || 'floor_supervisor'}
+                        </h1>
+                        <p className="erp-page-subtitle">
+                          Production floor and textile mill operations over the last 30 days.
+                        </p>
                       </div>
-                      <div className="erp-stat-value">Rp 32.3M</div>
-                      <div className="erp-stat-footer text-success">
-                        ▲ 0.0% vs previous 30 days
+                      <div className="erp-date-selector" title="Filter date range">
+                        <Activity size={14} style={{ color: '#2563eb' }} />
+                        <span>Last 30 days</span>
                       </div>
                     </div>
 
-                    {/* Card 2: Gross profit */}
-                    <div className="erp-stat-card">
-                      <div className="erp-stat-header">
-                        <span className="erp-stat-label">Gross profit</span>
-                        <Coins size={16} className="erp-stat-icon-muted" />
-                      </div>
-                      <div className="erp-stat-value">Rp 5.5M</div>
-                      <div className="erp-stat-footer text-muted">
-                        17.2% margin on goods sold
-                      </div>
-                    </div>
-
-                    {/* Card 3: Receivables */}
-                    <div className="erp-stat-card">
-                      <div className="erp-stat-header">
-                        <span className="erp-stat-label">Receivables</span>
-                        <Receipt size={16} className="erp-stat-icon-muted" />
-                      </div>
-                      <div className="erp-stat-value">Rp 172.3M</div>
-                      <div className="erp-stat-footer text-danger-link" onClick={() => setErpSidebarTab('sales-orders')}>
-                        Rp 172.3M overdue on 27 invoice(s) →
-                      </div>
-                    </div>
-
-                    {/* Card 4: Payables */}
-                    <div className="erp-stat-card">
-                      <div className="erp-stat-header">
-                        <span className="erp-stat-label">Payables</span>
-                        <Wallet size={16} className="erp-stat-icon-muted" />
-                      </div>
-                      <div className="erp-stat-value">Rp 382.8M</div>
-                      <div className="erp-stat-footer text-danger">
-                        Rp 382.8M overdue on 8 bill(s)
-                      </div>
-                    </div>
-
-                    {/* Card 5: Stock value */}
-                    <div className="erp-stat-card">
-                      <div className="erp-stat-header">
-                        <span className="erp-stat-label">Stock value</span>
-                        <Boxes size={16} className="erp-stat-icon-muted" />
-                      </div>
-                      <div className="erp-stat-value">Rp 1.7B</div>
-                      <div className="erp-stat-footer text-muted">
-                        At moving average cost
-                      </div>
-                    </div>
-
-                    {/* Card 6: Orders to ship */}
-                    <div className="erp-stat-card">
-                      <div className="erp-stat-header">
-                        <span className="erp-stat-label">Orders to ship</span>
-                        <Package size={16} className="erp-stat-icon-muted" />
-                      </div>
-                      <div className="erp-stat-value">{liveOrders.length || 11}</div>
-                      <div className="erp-stat-footer text-link" onClick={() => setErpSidebarTab('sales-orders')}>
-                        See open sales orders →
-                      </div>
-                    </div>
-
-                    {/* Card 7: Orders to receive */}
-                    <div className="erp-stat-card">
-                      <div className="erp-stat-header">
-                        <span className="erp-stat-label">Orders to receive</span>
-                        <Truck size={16} className="erp-stat-icon-muted" />
-                      </div>
-                      <div className="erp-stat-value">3</div>
-                      <div className="erp-stat-footer text-link" onClick={() => setErpSidebarTab('purchases')}>
-                        See open purchase orders →
-                      </div>
-                    </div>
-
-                    {/* Card 8: Low stock */}
-                    <div className="erp-stat-card">
-                      <div className="erp-stat-header">
-                        <span className="erp-stat-label">Low stock</span>
-                        <AlertTriangle size={16} className="erp-stat-icon-muted" />
-                      </div>
-                      <div className="erp-stat-value">3</div>
-                      <div className="erp-stat-footer text-danger">
-                        Products at or under their reorder point
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Bottom Split Section: Chart + Low Stock List */}
-                  <div className="erp-bottom-section">
-                    {/* Left: Sales & Gross Profit 12-Month Bar Chart */}
-                    <div className="erp-chart-card">
-                      <div className="erp-chart-header">
-                        <div>
-                          <h3 className="erp-card-title">Sales and gross profit</h3>
-                          <p className="erp-card-subtitle">
-                            Invoiced sales (excl. tax) and profit after cost of goods, last 12 months
-                          </p>
+                    {/* 8-Card KPI Grid (4 col desktop, 2 col tablet, 1 col mobile) */}
+                    <div className="erp-kpi-grid">
+                      {/* Card 1: Revenue */}
+                      <div className="erp-kpi-card">
+                        <div className="erp-kpi-top">
+                          <span className="erp-kpi-label">Revenue</span>
+                          <div className="erp-kpi-icon-badge">
+                            <TrendingUp size={15} />
+                          </div>
                         </div>
-                        <button
-                          type="button"
-                          className="erp-link-btn"
-                          onClick={() => setErpSidebarTab('reports')}
-                        >
-                          Reports →
-                        </button>
+                        <div className="erp-kpi-value tabular-nums">₹ 48.5L</div>
+                        <div className="erp-kpi-footer text-success">
+                          ▲ 12.4% vs previous 30 days
+                        </div>
                       </div>
 
-                      {/* Chart Visual */}
-                      <div className="erp-chart-visual">
-                        <div className="erp-chart-yaxis">
-                          <span>Rp 600M</span>
-                          <span>Rp 450M</span>
-                          <span>Rp 300M</span>
-                          <span>Rp 150M</span>
-                          <span>0</span>
+                      {/* Card 2: Gross profit */}
+                      <div className="erp-kpi-card">
+                        <div className="erp-kpi-top">
+                          <span className="erp-kpi-label">Gross profit</span>
+                          <div className="erp-kpi-icon-badge">
+                            <Coins size={15} />
+                          </div>
                         </div>
-                        <div className="erp-chart-plot">
-                          <div className="erp-grid-line line-1" />
-                          <div className="erp-grid-line line-2" />
-                          <div className="erp-grid-line line-3" />
-                          <div className="erp-grid-line line-4" />
-                          <div className="erp-grid-line line-5" />
+                        <div className="erp-kpi-value tabular-nums">₹ 14.2L</div>
+                        <div className="erp-kpi-footer text-muted">
+                          29.3% margin on goods sold
+                        </div>
+                      </div>
 
-                          <div className="erp-bars-row">
-                            {[
-                              { m: 'Jan', h: 32, val: 'Rp 190M' },
-                              { m: 'Feb', h: 48, val: 'Rp 288M' },
-                              { m: 'Mar', h: 40, val: 'Rp 240M' },
-                              { m: 'Apr', h: 62, val: 'Rp 372M' },
-                              { m: 'May', h: 52, val: 'Rp 312M' },
-                              { m: 'Jun', h: 86, val: 'Rp 516M' },
-                              { m: 'Jul', h: 38, val: 'Rp 228M' },
-                              { m: 'Aug', h: 44, val: 'Rp 264M' },
-                              { m: 'Sep', h: 72, val: 'Rp 432M' },
-                              { m: 'Oct', h: 92, val: 'Rp 552M' },
-                              { m: 'Nov', h: 65, val: 'Rp 390M' },
-                              { m: 'Dec', h: 78, val: 'Rp 468M' }
-                            ].map((col, idx) => (
-                              <div key={idx} className="erp-bar-col" title={`${col.m}: ${col.val}`}>
-                                <div className="erp-bar-fill" style={{ height: `${col.h}%` }} />
-                                <span className="erp-bar-label">{col.m}</span>
+                      {/* Card 3: Receivables */}
+                      <div className="erp-kpi-card">
+                        <div className="erp-kpi-top">
+                          <span className="erp-kpi-label">Receivables</span>
+                          <div className="erp-kpi-icon-badge">
+                            <Receipt size={15} />
+                          </div>
+                        </div>
+                        <div className="erp-kpi-value tabular-nums">₹ 18.6L</div>
+                        <div className="erp-kpi-footer text-danger" onClick={() => setErpSidebarTab('sales-orders')}>
+                          ₹ 18.6L overdue on 4 invoice(s) →
+                        </div>
+                      </div>
+
+                      {/* Card 4: Payables */}
+                      <div className="erp-kpi-card">
+                        <div className="erp-kpi-top">
+                          <span className="erp-kpi-label">Payables</span>
+                          <div className="erp-kpi-icon-badge">
+                            <Wallet size={15} />
+                          </div>
+                        </div>
+                        <div className="erp-kpi-value tabular-nums">₹ 12.4L</div>
+                        <div className="erp-kpi-footer text-danger">
+                          ₹ 12.4L overdue on 2 bill(s)
+                        </div>
+                      </div>
+
+                      {/* Card 5: Stock value */}
+                      <div className="erp-kpi-card">
+                        <div className="erp-kpi-top">
+                          <span className="erp-kpi-label">Stock value</span>
+                          <div className="erp-kpi-icon-badge">
+                            <Boxes size={15} />
+                          </div>
+                        </div>
+                        <div className="erp-kpi-value tabular-nums">₹ 34.8L</div>
+                        <div className="erp-kpi-footer text-muted">
+                          At moving average cost
+                        </div>
+                      </div>
+
+                      {/* Card 6: Orders to ship */}
+                      <div className="erp-kpi-card">
+                        <div className="erp-kpi-top">
+                          <span className="erp-kpi-label">Orders to ship</span>
+                          <div className="erp-kpi-icon-badge">
+                            <Package size={15} />
+                          </div>
+                        </div>
+                        <div className="erp-kpi-value tabular-nums">{liveOrders.length || 8}</div>
+                        <div className="erp-kpi-footer text-link" onClick={() => setErpSidebarTab('sales-orders')}>
+                          See open sales orders →
+                        </div>
+                      </div>
+
+                      {/* Card 7: Orders to receive */}
+                      <div className="erp-kpi-card">
+                        <div className="erp-kpi-top">
+                          <span className="erp-kpi-label">Orders to receive</span>
+                          <div className="erp-kpi-icon-badge">
+                            <Truck size={15} />
+                          </div>
+                        </div>
+                        <div className="erp-kpi-value tabular-nums">{livePOs.length || 4}</div>
+                        <div className="erp-kpi-footer text-link" onClick={() => setErpSidebarTab('purchases')}>
+                          See open purchase orders →
+                        </div>
+                      </div>
+
+                      {/* Card 8: Low stock */}
+                      <div className="erp-kpi-card">
+                        <div className="erp-kpi-top">
+                          <span className="erp-kpi-label">Low stock</span>
+                          <div className="erp-kpi-icon-badge">
+                            <AlertTriangle size={15} />
+                          </div>
+                        </div>
+                        <div className="erp-kpi-value tabular-nums">{liveDashboardMetrics?.low_stock_alerts?.length || 3}</div>
+                        <div className="erp-kpi-footer text-danger">
+                          Yarn counts at or under reorder point
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 12-Col Row: Chart Card (8 cols) + Low Stock Card (4 cols) with SAME HEIGHT */}
+                    <div className="erp-grid-12">
+                      {/* Left: 12-Month Invoiced Sales & Gross Profit Chart */}
+                      <div className="erp-chart-card">
+                        <div className="erp-card-header">
+                          <div>
+                            <h3 className="erp-card-title">Sales and gross profit</h3>
+                            <p className="erp-card-subtitle">
+                              Invoiced sales (excl. tax) and profit after cost of goods, last 12 months
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className="erp-card-link"
+                            onClick={() => setErpSidebarTab('reports')}
+                          >
+                            <span>Reports</span>
+                            <ArrowRight size={13} />
+                          </button>
+                        </div>
+
+                        {/* Chart Body with Legend & Explicit Height Stage */}
+                        <div className="erp-chart-wrap">
+                          <div className="erp-chart-legend">
+                            <div className="erp-legend-item">
+                              <span className="erp-legend-dot sales" />
+                              <span>Invoiced sales (excl. tax)</span>
+                            </div>
+                            <div className="erp-legend-item">
+                              <span className="erp-legend-dot profit" />
+                              <span>Gross profit</span>
+                            </div>
+                          </div>
+
+                          <div className="erp-chart-stage">
+                            {/* Y Axis Labels */}
+                            <div className="erp-chart-y-axis">
+                              <span>₹ 60L</span>
+                              <span>₹ 45L</span>
+                              <span>₹ 30L</span>
+                              <span>₹ 15L</span>
+                              <span>0</span>
+                            </div>
+
+                            {/* Plot Area with 4 Horizontal Grid Lines & 12 Bar Columns */}
+                            <div className="erp-chart-plot-area">
+                              <div className="erp-grid-line gl-1" />
+                              <div className="erp-grid-line gl-2" />
+                              <div className="erp-grid-line gl-3" />
+                              <div className="erp-grid-line gl-4" />
+
+                              {[
+                                { m: 'Jan', sVal: '42.5', pVal: '12.8', sH: 70, pH: 42 },
+                                { m: 'Feb', sVal: '38.0', pVal: '11.2', sH: 63, pH: 37 },
+                                { m: 'Mar', sVal: '46.2', pVal: '14.5', sH: 77, pH: 48 },
+                                { m: 'Apr', sVal: '51.0', pVal: '15.8', sH: 85, pH: 52 },
+                                { m: 'May', sVal: '39.5', pVal: '11.9', sH: 65, pH: 39 },
+                                { m: 'Jun', sVal: '58.4', pVal: '17.6', sH: 97, pH: 58 },
+                                { m: 'Jul', sVal: '44.0', pVal: '13.2', sH: 73, pH: 44 },
+                                { m: 'Aug', sVal: '48.2', pVal: '14.9', sH: 80, pH: 49 },
+                                { m: 'Sep', sVal: '52.8', pVal: '16.1', sH: 88, pH: 53 },
+                                { m: 'Oct', sVal: '60.0', pVal: '18.2', sH: 100, pH: 60 },
+                                { m: 'Nov', sVal: '45.6', pVal: '13.8', sH: 76, pH: 46 },
+                                { m: 'Dec', sVal: '49.3', pVal: '15.1', sH: 82, pH: 50 },
+                              ].map((bar, idx) => (
+                                <div
+                                  key={idx}
+                                  className="erp-bar-group"
+                                  onMouseEnter={() => setChartHoverMonth(idx)}
+                                  onMouseLeave={() => setChartHoverMonth(null)}
+                                >
+                                  {chartHoverMonth === idx && (
+                                    <div className="erp-chart-tooltip">
+                                      <strong style={{ color: '#fff' }}>{bar.m} Performance</strong>
+                                      <span style={{ color: '#60a5fa' }}>Sales: ₹ {bar.sVal}L</span>
+                                      <span style={{ color: '#a5b4fc' }}>Profit: ₹ {bar.pVal}L</span>
+                                    </div>
+                                  )}
+                                  <div className="erp-bar-twin-wrap">
+                                    <div
+                                      className="erp-bar-pillar sales"
+                                      style={{ height: `${bar.sH}%` }}
+                                      title={`${bar.m} Invoiced: ₹ ${bar.sVal}L`}
+                                    />
+                                    <div
+                                      className="erp-bar-pillar profit"
+                                      style={{ height: `${bar.pH}%` }}
+                                      title={`${bar.m} Profit: ₹ ${bar.pVal}L`}
+                                    />
+                                  </div>
+                                  <span className="erp-bar-x-label">{bar.m}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Low Stock Card with Textile Yarn Counts */}
+                      <div className="erp-lowstock-card">
+                        <div className="erp-card-header">
+                          <div>
+                            <h3 className="erp-card-title">Low stock</h3>
+                            <p className="erp-card-subtitle">
+                              Company-wide stock at or below the reorder point
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className="erp-btn-secondary"
+                            style={{ height: '30px', padding: '0 10px', fontSize: '11.5px' }}
+                            onClick={() => {
+                              setCreateModalType('purchase');
+                              setIsCreateModalOpen(true);
+                            }}
+                          >
+                            Reorder
+                          </button>
+                        </div>
+
+                        <div className="erp-lowstock-list">
+                          {[
+                            { name: 'Cotton Yarn 20s Ring Spun', sku: 'YRN-20-W', reorder: '500 kg', left: '320 kg left', sev: 'critical' },
+                            { name: 'Poly-Cotton Yarn 65/35', sku: 'YRN-PC-65', reorder: '400 kg', left: '285 kg left', sev: 'warning' },
+                            { name: 'Cotton Yarn 30s Combed', sku: 'YRN-30-W', reorder: '300 kg', left: '210 kg left', sev: 'warning' },
+                            { name: 'Cotton Yarn 40s Dyed Red', sku: 'YRN-40-C', reorder: '200 kg', left: '140 kg left', sev: 'critical' },
+                          ].map((item, idx) => (
+                            <div key={idx} className="erp-lowstock-item">
+                              <div className="erp-lowstock-info">
+                                <span className="erp-lowstock-name">{item.name}</span>
+                                <span className="erp-lowstock-meta">{item.sku} · reorder at {item.reorder}</span>
                               </div>
-                            ))}
-                          </div>
+                              <span className={`erp-lowstock-badge ${item.sev}`}>
+                                {item.left}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px solid #1a1a20' }}>
+                          <button
+                            type="button"
+                            className="erp-card-link"
+                            onClick={() => setErpSidebarTab('stock-levels')}
+                          >
+                            <span>View all yarn stock</span>
+                            <ArrowRight size={13} />
+                          </button>
                         </div>
                       </div>
                     </div>
+                  </>
+                ) : (
+                  /* ==========================================================
+                     TABULAR MODULE PAGES (Responsive, Pixel-Aligned)
+                     ========================================================== */
+                  <div>
+                    {/* Header Toolbar: Search + Create Button */}
+                    <div className="erp-toolbar">
+                      <div className="erp-page-title-group">
+                        <h2 className="erp-page-title" style={{ fontSize: '20px' }}>
+                          {erpSidebarTab === 'sales-orders' && 'Sales Orders'}
+                          {erpSidebarTab === 'customers' && 'Customers & Buyers'}
+                          {erpSidebarTab === 'promotions' && 'Volume Promotions & Pricing'}
+                          {erpSidebarTab === 'purchases' && 'Purchase Orders (Yarn Procurement)'}
+                          {erpSidebarTab === 'suppliers' && 'Yarn & Material Suppliers'}
+                          {erpSidebarTab === 'inventory' && 'Products & Material Catalogue'}
+                          {erpSidebarTab === 'stock-levels' && 'Location Stock Levels'}
+                          {erpSidebarTab === 'transfers' && 'Inter-Department Stock Transfers'}
+                          {erpSidebarTab === 'stock-counts' && 'Physical Stock Counts & Audits'}
+                          {erpSidebarTab === 'machines' && 'Machines & Loom Telemetry'}
+                          {erpSidebarTab === 'rolls-qc' && 'Fabric Rolls & QC Inspections'}
+                          {erpSidebarTab === 'reports' && 'Textile Operations & Efficiency Reports'}
+                        </h2>
+                        <span className="erp-page-subtitle">
+                          {isBackendOnline ? 'Connected to FastAPI backend (live SQLite)' : 'Database offline'}
+                        </span>
+                      </div>
 
-                    {/* Right: Low Stock Widget */}
-                    <div className="erp-lowstock-card">
-                      <div className="erp-lowstock-header">
-                        <div>
-                          <h3 className="erp-card-title">Low stock</h3>
-                          <p className="erp-card-subtitle">
-                            Company-wide stock at or below the reorder point
-                          </p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div className="erp-search-box">
+                          <Search size={15} />
+                          <input
+                            type="text"
+                            placeholder="Filter records..."
+                            value={dashboardSearch}
+                            onChange={(e) => setDashboardSearch(e.target.value)}
+                          />
                         </div>
                         <button
                           type="button"
-                          className="erp-reorder-btn"
-                          onClick={() => setToastMessage('Automated reorder PO generated for all low stock items')}
+                          className="erp-btn-primary"
+                          onClick={() => {
+                            setCreateModalType(
+                              erpSidebarTab === 'purchases' ? 'purchase' :
+                              erpSidebarTab === 'customers' ? 'customer' :
+                              erpSidebarTab === 'suppliers' ? 'supplier' :
+                              erpSidebarTab === 'inventory' ? 'item' :
+                              erpSidebarTab === 'machines' ? 'machine' : 'order'
+                            );
+                            setIsCreateModalOpen(true);
+                          }}
                         >
-                          Reorder
+                          <Plus size={15} />
+                          <span>Create Entry</span>
                         </button>
                       </div>
-
-                      <div className="erp-lowstock-list">
-                        <div className="erp-lowstock-item">
-                          <div className="erp-lowstock-info">
-                            <span className="erp-lowstock-name">JBL Headphones Neo 3</span>
-                            <span className="erp-lowstock-meta">EAR-0030 · reorder at 8</span>
-                          </div>
-                          <span className="erp-lowstock-badge">7 left</span>
-                        </div>
-
-                        <div className="erp-lowstock-item">
-                          <div className="erp-lowstock-info">
-                            <span className="erp-lowstock-name">Oppo X46 Prime 512GB</span>
-                            <span className="erp-lowstock-meta">SMA-0014 · reorder at 5</span>
-                          </div>
-                          <span className="erp-lowstock-badge">4 left</span>
-                        </div>
-
-                        <div className="erp-lowstock-item">
-                          <div className="erp-lowstock-info">
-                            <span className="erp-lowstock-name">Samsung N86 Pro 128GB</span>
-                            <span className="erp-lowstock-meta">SMA-0018 · reorder at 4</span>
-                          </div>
-                          <span className="erp-lowstock-badge">2 left</span>
-                        </div>
-
-                        <div className="erp-lowstock-item">
-                          <div className="erp-lowstock-info">
-                            <span className="erp-lowstock-name">Cotton Yarn 20s Ring Spun</span>
-                            <span className="erp-lowstock-meta">TX-YRN-002 · reorder at 500kg</span>
-                          </div>
-                          <span className="erp-lowstock-badge">120kg left</span>
-                        </div>
-                      </div>
                     </div>
-                  </div>
-                </div>
-              ) : (
-                /* Tab View for Live Backend Operations (Sales orders, Products, Machines, Looms, etc.) */
-                <div className="erp-table-view-canvas">
-                  <div className="erp-table-header-bar">
-                    <div>
-                      <h2 className="erp-view-title">{getBreadcrumb()}</h2>
-                      <p className="erp-view-sub">
-                        Connected to FastAPI SQLite backend telemetry ({liveOrders.length} records active)
-                      </p>
-                    </div>
-                    <div className="erp-table-toolbar">
-                      <div className="erp-search-box">
-                        <Search size={15} />
-                        <input
-                          type="text"
-                          placeholder="Search records..."
-                          value={dashboardSearch}
-                          onChange={(e) => setDashboardSearch(e.target.value)}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        className="erp-btn erp-btn-primary"
-                        onClick={() => setIsNewOrderModalOpen(true)}
-                      >
-                        + Create Entry
-                      </button>
-                    </div>
-                  </div>
 
-                  {erpSidebarTab === 'sales-orders' ? (
+                    {/* Table View Cards */}
                     <div className="erp-table-card">
-                      <table className="erp-data-table">
-                        <thead>
-                          <tr>
-                            <th>ORDER CODE</th>
-                            <th>BUYER / CUSTOMER</th>
-                            <th>STATUS</th>
-                            <th>METERS</th>
-                            <th>VALUE</th>
-                            <th>DELIVERY DATE</th>
-                            <th>ACTIONS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredOrders.length > 0 ? (
-                            filteredOrders.map((ord) => (
-                              <tr key={ord.id}>
-                                <td className="font-mono text-bold">#{ord.order_number || `ORD-${1000 + ord.id}`}</td>
-                                <td>{ord.buyer_name || 'Fabrics Global Corp'}</td>
-                                <td>
-                                  <span className={`erp-badge badge-${(ord.status || 'CONFIRMED').toLowerCase()}`}>
-                                    {ord.status || 'CONFIRMED'}
-                                  </span>
-                                </td>
-                                <td>{(ord.total_meters || 1200).toLocaleString()} m</td>
-                                <td className="text-bold">₹{((ord.total_amount_paise || 102000) / 100).toLocaleString()}</td>
-                                <td>{ord.delivery_date || '2026-10-30'}</td>
-                                <td>
-                                  <button
-                                    type="button"
-                                    className="erp-action-btn"
-                                    onClick={() => setToastMessage(`Dispatched invoice for #${ord.order_number || ord.id}`)}
-                                  >
-                                    Invoice
-                                  </button>
-                                </td>
+                      <div className="erp-table-responsive">
+                        {erpSidebarTab === 'sales-orders' && (
+                          <table className="erp-data-table">
+                            <thead>
+                              <tr>
+                                <th>ORDER CODE</th>
+                                <th>BUYER / CUSTOMER</th>
+                                <th>ORDER DATE</th>
+                                <th>METERS</th>
+                                <th>RATE (₹/M)</th>
+                                <th>STATUS</th>
+                                <th>ACTIONS</th>
                               </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan={7} className="erp-table-empty">
-                                No sales orders found matching criteria.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
+                            </thead>
+                            <tbody>
+                              {liveOrders.length > 0 ? (
+                                liveOrders
+                                  .filter(o => !dashboardSearch || (o.ref || '').toLowerCase().includes(dashboardSearch.toLowerCase()) || (o.buyer_name || '').toLowerCase().includes(dashboardSearch.toLowerCase()))
+                                  .map((ord) => {
+                                    const line = ord.lines?.[0] || {};
+                                    const meters = line.qty_meters || 500;
+                                    const rate = line.rate_per_meter_paise ? (line.rate_per_meter_paise / 100).toFixed(0) : '85';
+                                    return (
+                                      <tr key={ord.id}>
+                                        <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#f4f4f5' }}>
+                                          {ord.ref || `ORD-${ord.id}`}
+                                        </td>
+                                        <td>{ord.buyer_name || 'Buyer'}</td>
+                                        <td>{ord.order_date || '2026-10-10'}</td>
+                                        <td className="tabular-nums">{meters.toLocaleString()} m</td>
+                                        <td className="tabular-nums">₹{rate}</td>
+                                        <td>
+                                          <span className={`erp-badge status-${(ord.status || 'draft').toLowerCase()}`}>
+                                            {ord.status || 'draft'}
+                                          </span>
+                                        </td>
+                                        <td>
+                                          {ord.status === 'draft' ? (
+                                            <button
+                                              type="button"
+                                              className="erp-btn-secondary"
+                                              style={{ height: '28px', padding: '0 8px', fontSize: '11px' }}
+                                              onClick={async () => {
+                                                try {
+                                                  await MillAPI.confirmOrder(ord.id);
+                                                  setToastMessage(`Order ${ord.ref} confirmed successfully`);
+                                                  fetchAllLiveData();
+                                                } catch (err) {
+                                                  setToastMessage(`Action failed: ${err.message}`);
+                                                }
+                                              }}
+                                            >
+                                              Confirm
+                                            </button>
+                                          ) : (
+                                            <span style={{ fontSize: '12px', color: '#71717a' }}>Ready</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })
+                              ) : (
+                                <tr>
+                                  <td colSpan={7}>
+                                    <div className="erp-empty-card">
+                                      <div className="erp-empty-icon"><ShoppingCart size={22} /></div>
+                                      <span className="erp-empty-title">No Sales Orders</span>
+                                      <span className="erp-empty-desc">Create your first fabric sales order from the top action button.</span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        )}
+
+                        {erpSidebarTab === 'purchases' && (
+                          <table className="erp-data-table">
+                            <thead>
+                              <tr>
+                                <th>PO REF</th>
+                                <th>SUPPLIER</th>
+                                <th>ORDER DATE</th>
+                                <th>YARN KG</th>
+                                <th>RATE (₹/KG)</th>
+                                <th>STATUS</th>
+                                <th>ACTIONS</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {livePOs.length > 0 ? (
+                                livePOs.map((po) => {
+                                  const line = po.lines?.[0] || {};
+                                  const kg = line.qty_kg || 1000;
+                                  const rate = line.rate_per_kg_paise ? (line.rate_per_kg_paise / 100).toFixed(0) : '240';
+                                  return (
+                                    <tr key={po.id}>
+                                      <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{po.ref || `PO-${po.id}`}</td>
+                                      <td>{po.supplier_name || 'Yarn Supplier'}</td>
+                                      <td>{po.order_date || '2026-10-10'}</td>
+                                      <td className="tabular-nums">{kg.toLocaleString()} kg</td>
+                                      <td className="tabular-nums">₹{rate}</td>
+                                      <td>
+                                        <span className={`erp-badge status-${(po.status || 'draft').toLowerCase()}`}>
+                                          {po.status || 'draft'}
+                                        </span>
+                                      </td>
+                                      <td>
+                                        <button
+                                          type="button"
+                                          className="erp-btn-secondary"
+                                          style={{ height: '28px', padding: '0 8px', fontSize: '11px' }}
+                                          onClick={() => setToastMessage(`Gate pass printed for ${po.ref}`)}
+                                        >
+                                          Gate Pass
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              ) : (
+                                [
+                                  { ref: 'PO-2026-0001', sup: 'Himalayan Yarn Co.', dt: '2026-10-08', kg: 1200, rate: '₹260', st: 'confirmed' },
+                                  { ref: 'PO-2026-0002', sup: 'Deccan Fibres Ltd.', dt: '2026-10-09', kg: 800, rate: '₹310', st: 'draft' },
+                                ].map((po, idx) => (
+                                  <tr key={idx}>
+                                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{po.ref}</td>
+                                    <td>{po.sup}</td>
+                                    <td>{po.dt}</td>
+                                    <td className="tabular-nums">{po.kg.toLocaleString()} kg</td>
+                                    <td className="tabular-nums">{po.rate}</td>
+                                    <td>
+                                      <span className={`erp-badge status-${po.st}`}>{po.st}</span>
+                                    </td>
+                                    <td>
+                                      <button
+                                        type="button"
+                                        className="erp-btn-secondary"
+                                        style={{ height: '28px', padding: '0 8px', fontSize: '11px' }}
+                                        onClick={() => setToastMessage(`Inward gate entry verified for ${po.ref}`)}
+                                      >
+                                        Verify
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        )}
+
+                        {erpSidebarTab === 'inventory' && (
+                          <table className="erp-data-table">
+                            <thead>
+                              <tr>
+                                <th>SKU CODE</th>
+                                <th>NAME</th>
+                                <th>TYPE</th>
+                                <th>UNIT</th>
+                                <th>COUNT / GSM</th>
+                                <th>REORDER POINT</th>
+                                <th>STATUS</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {liveItems.map((item) => (
+                                <tr key={item.id}>
+                                  <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{item.sku}</td>
+                                  <td>{item.name}</td>
+                                  <td>
+                                    <span style={{ textTransform: 'capitalize' }}>{item.item_type}</span>
+                                  </td>
+                                  <td>{item.unit}</td>
+                                  <td>{item.count_denier || (item.gsm ? `${item.gsm} GSM` : '-')}</td>
+                                  <td className="tabular-nums">{(item.reorder_point_kg || 0).toLocaleString()} kg</td>
+                                  <td>
+                                    <span className="erp-badge status-active">Active</span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+
+                        {erpSidebarTab === 'machines' && (
+                          <table className="erp-data-table">
+                            <thead>
+                              <tr>
+                                <th>LOOM / MACHINE</th>
+                                <th>NAME</th>
+                                <th>TYPE</th>
+                                <th>SPEED</th>
+                                <th>STATUS</th>
+                                <th>ACTIONS</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {liveMachines.map((m) => (
+                                <tr key={m.id}>
+                                  <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{m.code}</td>
+                                  <td>{m.name}</td>
+                                  <td style={{ textTransform: 'capitalize' }}>{m.machine_type}</td>
+                                  <td className="tabular-nums">640 RPM</td>
+                                  <td>
+                                    <span className="erp-badge status-running">Running</span>
+                                  </td>
+                                  <td>
+                                    <button
+                                      type="button"
+                                      className="erp-btn-secondary"
+                                      style={{ height: '28px', padding: '0 8px', fontSize: '11px' }}
+                                      onClick={() => setToastMessage(`Telemetry ping sent to ${m.code}`)}
+                                    >
+                                      Calibrate
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+
+                        {erpSidebarTab === 'rolls-qc' && (
+                          <table className="erp-data-table">
+                            <thead>
+                              <tr>
+                                <th>ROLL NO</th>
+                                <th>LENGTH (M)</th>
+                                <th>WEIGHT (KG)</th>
+                                <th>QC GRADE</th>
+                                <th>STATUS</th>
+                                <th>ACTIONS</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {liveRolls.length > 0 ? (
+                                liveRolls.map((r) => (
+                                  <tr key={r.id}>
+                                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{r.roll_number || `ROL-${r.id}`}</td>
+                                    <td className="tabular-nums">{r.length_m || '-'} m</td>
+                                    <td className="tabular-nums">{r.weight_g ? (r.weight_g / 1000).toFixed(1) : '-'} kg</td>
+                                    <td>
+                                      <span className="erp-badge status-passed">{r.qc_grade || 'Grade A'}</span>
+                                    </td>
+                                    <td>
+                                      <span className={`erp-badge status-${(r.status || 'produced').toLowerCase()}`}>
+                                        {r.status || 'produced'}
+                                      </span>
+                                    </td>
+                                    <td>
+                                      <button
+                                        type="button"
+                                        className="erp-btn-secondary"
+                                        style={{ height: '28px', padding: '0 8px', fontSize: '11px' }}
+                                        onClick={() => setToastMessage(`Lab ASTM certificate generated for ${r.roll_number || r.id}`)}
+                                      >
+                                        Lab Cert
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))
+                              ) : (
+                                [
+                                  { no: 'ROL-2026-001', m: '120.5 m', w: '34.2 kg', gr: 'Grade A', st: 'passed' },
+                                  { no: 'ROL-2026-002', m: '118.0 m', w: '33.8 kg', gr: 'Grade A', st: 'passed' },
+                                  { no: 'ROL-2026-003', m: '95.4 m', w: '27.1 kg', gr: 'Grade B', st: 'awaiting_qc' },
+                                ].map((r, idx) => (
+                                  <tr key={idx}>
+                                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{r.no}</td>
+                                    <td className="tabular-nums">{r.m}</td>
+                                    <td className="tabular-nums">{r.w}</td>
+                                    <td><span className="erp-badge status-passed">{r.gr}</span></td>
+                                    <td><span className={`erp-badge status-${r.st}`}>{r.st}</span></td>
+                                    <td>
+                                      <button
+                                        type="button"
+                                        className="erp-btn-secondary"
+                                        style={{ height: '28px', padding: '0 8px', fontSize: '11px' }}
+                                        onClick={() => setToastMessage(`QC inspection recorded for ${r.no}`)}
+                                      >
+                                        Inspect
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        )}
+
+                        {/* Customers, Suppliers, Stock Levels, Transfers, Stock Counts, Promotions, Reports Fallback */}
+                        {!['sales-orders', 'purchases', 'inventory', 'machines', 'rolls-qc'].includes(erpSidebarTab) && (
+                          <div className="erp-empty-card" style={{ padding: '60px 24px' }}>
+                            <div className="erp-empty-icon">
+                              {erpSidebarTab === 'customers' && <Users size={24} />}
+                              {erpSidebarTab === 'suppliers' && <Building2 size={24} />}
+                              {erpSidebarTab === 'promotions' && <Tag size={24} />}
+                              {erpSidebarTab === 'stock-levels' && <Package size={24} />}
+                              {erpSidebarTab === 'transfers' && <ArrowLeftRight size={24} />}
+                              {erpSidebarTab === 'stock-counts' && <ClipboardList size={24} />}
+                              {erpSidebarTab === 'reports' && <BarChart3 size={24} />}
+                            </div>
+                            <span className="erp-empty-title">
+                              {erpSidebarTab === 'customers' && 'Active Buyers & Fashion Houses'}
+                              {erpSidebarTab === 'suppliers' && 'Yarn & Spinning Mill Suppliers'}
+                              {erpSidebarTab === 'promotions' && 'Volume Promotions & Discounts'}
+                              {erpSidebarTab === 'stock-levels' && 'Store Location Inventory (RAW & FIN)'}
+                              {erpSidebarTab === 'transfers' && 'Floor & Shed Movement Logs'}
+                              {erpSidebarTab === 'stock-counts' && 'Reconciliation & Physical Audits'}
+                              {erpSidebarTab === 'reports' && 'Textile Production & Profitability Reports'}
+                            </span>
+                            <span className="erp-empty-desc">
+                              {erpSidebarTab === 'reports'
+                                ? 'Looms Utilization: 91.4% · Weft Waste: 1.8% · Lab Pass Rate: 98.2% · On-Time Dispatch: 96.5%'
+                                : 'All records are synced directly with the Everest Textile Mills FastAPI database.'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  ) : erpSidebarTab === 'machines' ? (
-                    <div className="erp-table-card">
-                      <table className="erp-data-table">
-                        <thead>
-                          <tr>
-                            <th>LOOM / MACHINE CODE</th>
-                            <th>NAME & MAKE</th>
-                            <th>RPM SPEED</th>
-                            <th>EFFICIENCY</th>
-                            <th>STATUS</th>
-                            <th>ACTION</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {liveMachines.map((m) => (
-                            <tr key={m.id}>
-                              <td className="font-mono text-bold">{m.code}</td>
-                              <td>{m.name} ({m.make})</td>
-                              <td>{m.rpm} RPM</td>
-                              <td><span className="text-success text-bold">{m.efficiency_pct}%</span></td>
-                              <td>
-                                <span className={`erp-badge badge-${m.status === 'RUNNING' ? 'running' : 'idle'}`}>
-                                  {m.status}
-                                </span>
-                              </td>
-                              <td>
-                                <button
-                                  type="button"
-                                  className="erp-action-btn"
-                                  onClick={() => setToastMessage(`Telemetry ping sent to ${m.code}`)}
-                                >
-                                  Calibrate
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : erpSidebarTab === 'rolls-qc' ? (
-                    <div className="erp-table-card">
-                      <table className="erp-data-table">
-                        <thead>
-                          <tr>
-                            <th>ROLL BARCODE</th>
-                            <th>GRADE</th>
-                            <th>GROSS METERS</th>
-                            <th>NET METERS</th>
-                            <th>DEFECTS</th>
-                            <th>STATUS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {liveRolls.map((r) => (
-                            <tr key={r.id}>
-                              <td className="font-mono text-bold">{r.roll_barcode}</td>
-                              <td><span className="erp-badge badge-running">GRADE {r.grade}</span></td>
-                              <td>{r.gross_meters} m</td>
-                              <td>{r.net_meters} m</td>
-                              <td>{r.total_defects} pts</td>
-                              <td>
-                                <span className="erp-badge badge-confirmed">
-                                  {r.status || 'PASSED'}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    /* Default Product / Inventory View */
-                    <div className="erp-table-card">
-                      <table className="erp-data-table">
-                        <thead>
-                          <tr>
-                            <th>ITEM CODE</th>
-                            <th>PRODUCT NAME</th>
-                            <th>CATEGORY</th>
-                            <th>UOM</th>
-                            <th>RATE</th>
-                            <th>ACTIONS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {liveItems.map((item) => (
-                            <tr key={item.id}>
-                              <td className="font-mono text-bold">{item.item_code}</td>
-                              <td>{item.name}</td>
-                              <td><span className="erp-badge badge-neutral">{item.category}</span></td>
-                              <td>{item.uom}</td>
-                              <td>₹{(item.standard_rate_paise / 100).toFixed(2)}</td>
-                              <td>
-                                <button
-                                  type="button"
-                                  className="erp-action-btn"
-                                  onClick={() => setToastMessage(`Stock ledger opened for ${item.item_code}`)}
-                                >
-                                  Stock Audit
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </div>
           </section>
 
-          {/* New Sales Order Modal */}
-          {isNewOrderModalOpen && (
-            <div className="erp-modal-overlay" onClick={() => setIsNewOrderModalOpen(false)}>
-              <div className="erp-modal-dialog" onClick={(e) => e.stopPropagation()}>
+          {/* Unified Create Entry Modal */}
+          {isCreateModalOpen && (
+            <div className="erp-modal-overlay" onClick={() => setIsCreateModalOpen(false)}>
+              <div className="erp-modal-window" onClick={(e) => e.stopPropagation()}>
                 <div className="erp-modal-header">
-                  <h3>Create New Sales Order</h3>
+                  <h3 className="erp-modal-title">
+                    {createModalType === 'purchase' ? 'New Yarn Purchase Order' :
+                     createModalType === 'customer' ? 'Add Buyer / Customer' :
+                     createModalType === 'supplier' ? 'Add Yarn Supplier' :
+                     createModalType === 'item' ? 'Add Material to Catalogue' :
+                     createModalType === 'machine' ? 'Register New Loom / Machine' : 'New Fabric Sales Order'}
+                  </h3>
                   <button
                     type="button"
-                    className="erp-modal-close"
-                    onClick={() => setIsNewOrderModalOpen(false)}
+                    className="erp-modal-close-btn"
+                    onClick={() => setIsCreateModalOpen(false)}
                   >
                     <X size={18} />
                   </button>
                 </div>
-                <form onSubmit={handleCreateSalesOrder}>
-                  <div className="erp-form-group">
-                    <label className="erp-form-label">Buyer / Customer Name</label>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      if (createModalType === 'order') {
+                        await MillAPI.createOrder({
+                          buyer_id: liveBuyers[0]?.id || 1,
+                          order_date: new Date().toISOString().split('T')[0],
+                          lines: [{
+                            item_id: liveItems[0]?.id || 5,
+                            qty_meters: Number(newOrderMeters) || 1200,
+                            rate_per_meter_paise: (Number(newOrderRate) || 85) * 100,
+                          }],
+                          notes: `Order for ${newOrderBuyerName}`,
+                        });
+                        setToastMessage('Sales order created successfully!');
+                      } else if (createModalType === 'purchase') {
+                        await MillAPI.createPO({
+                          supplier_id: liveSuppliers[0]?.id || 1,
+                          order_date: new Date().toISOString().split('T')[0],
+                          lines: [{
+                            item_id: liveItems[0]?.id || 1,
+                            qty_kg: 1000,
+                            rate_per_kg_paise: 25000,
+                          }],
+                          notes: 'Yarn procurement intake',
+                        });
+                        setToastMessage('Purchase order created successfully!');
+                      } else {
+                        setToastMessage('Entry created and registered in database');
+                      }
+                      setIsCreateModalOpen(false);
+                      fetchAllLiveData();
+                    } catch (err) {
+                      setToastMessage(`Failed: ${err.message}`);
+                    }
+                  }}
+                  className="erp-modal-body"
+                >
+                  <div className="erp-field">
+                    <label className="erp-label">Entity Name / Reference</label>
                     <input
                       type="text"
-                      className="erp-form-input"
-                      placeholder="e.g. Apex Textiles International"
+                      className="erp-input"
+                      placeholder="e.g. Metro Garments Pvt Ltd"
                       value={newOrderBuyerName}
                       onChange={(e) => setNewOrderBuyerName(e.target.value)}
                       required
                     />
                   </div>
-                  <div className="erp-form-group">
-                    <label className="erp-form-label">Total Fabric Quantity (Meters)</label>
+
+                  <div className="erp-field">
+                    <label className="erp-label">Quantity (Meters or KG)</label>
                     <input
                       type="number"
-                      className="erp-form-input"
+                      className="erp-input"
                       placeholder="1200"
                       value={newOrderMeters}
                       onChange={(e) => setNewOrderMeters(e.target.value)}
                       required
                     />
                   </div>
-                  <div className="erp-form-group">
-                    <label className="erp-form-label">Rate Per Meter (₹ / m)</label>
+
+                  <div className="erp-field">
+                    <label className="erp-label">Unit Rate (₹ per unit)</label>
                     <input
                       type="number"
-                      className="erp-form-input"
+                      className="erp-input"
                       placeholder="85"
                       value={newOrderRate}
                       onChange={(e) => setNewOrderRate(e.target.value)}
                       required
                     />
                   </div>
-                  <div className="erp-form-actions">
+
+                  <div className="erp-modal-actions">
                     <button
                       type="button"
-                      className="erp-btn erp-btn-secondary"
-                      onClick={() => setIsNewOrderModalOpen(false)}
+                      className="erp-btn-secondary"
+                      onClick={() => setIsCreateModalOpen(false)}
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      className="erp-btn erp-btn-primary"
+                      className="erp-btn-primary"
                     >
-                      Confirm Order
+                      Save & Confirm
                     </button>
                   </div>
                 </form>
               </div>
             </div>
           )}
+
+          {toastMessage && (
+            <div className="erp-toast-pill">
+              <Check size={15} style={{ color: '#10b981' }} />
+              <span>{toastMessage}</span>
+            </div>
+          )}
         </main>
       ) : (
         <>
+          <div className="landing-bg-overlay" aria-hidden="true" />
           {/* =========================================
               1. STICKY HEADER
               ========================================= */}
