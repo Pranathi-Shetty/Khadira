@@ -219,7 +219,7 @@ export const MillAPI = {
 
   // --- QC Defects ---
   async reportDefect(rollId, defectType, severity, locationM, notes) {
-    return request(`/qc/defects`, {
+    return apiRequest(`/qc/defects`, {
       method: 'POST',
       body: JSON.stringify({
         roll_id: rollId,
@@ -232,23 +232,23 @@ export const MillAPI = {
   },
 
   async getDefects(rollId) {
-    return request(`/qc/defects/${rollId}`);
+    return apiRequest(`/qc/defects/${rollId}`);
   },
 
   // --- Notifications ---
   async getNotifications() {
-    return request('/notifications');
+    return apiRequest('/notifications');
   },
 
   async markNotificationRead(notifId) {
-    return request(`/notifications/${notifId}/read`, {
+    return apiRequest(`/notifications/${notifId}/read`, {
       method: 'POST',
     });
   },
 
   // --- Production Downtime ---
   async reportDowntime(machineId, runId, reason, description) {
-    return request(`/production/downtime`, {
+    return apiRequest(`/production/downtime`, {
       method: 'POST',
       body: JSON.stringify({
         machine_id: machineId,
@@ -261,7 +261,7 @@ export const MillAPI = {
 
   // --- Run Reconciliation ---
   async finalizeRun(runId, reconciliationData) {
-    return request(`/production/${runId}/finalize`, {
+    return apiRequest(`/production/${runId}/finalize`, {
       method: 'POST',
       body: JSON.stringify(reconciliationData),
     });
@@ -269,7 +269,6 @@ export const MillAPI = {
 
   // --- Finance & Invoices ---
   async getInvoices(invType = null) {
-    const params = invType ? { inv_type: invType } : {};
     return apiRequest(`/finance/invoices${invType ? `?inv_type=${invType}` : ''}`);
   },
 
