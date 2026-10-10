@@ -38,7 +38,10 @@ The backend is built with FastAPI. We recommend using a virtual environment.
 
 ```bash
 cd backend
-pip install -r requirements.txt
+python -m venv .venv
+# Windows PowerShell: .\.venv\Scripts\Activate.ps1
+# macOS/Linux: source .venv/bin/activate
+python -m pip install -r requirements.txt -r requirements-dev.txt
 
 # Load initial schema, roles, partners, stock, and workers
 python -m mill.seed            
@@ -53,12 +56,12 @@ python -m uvicorn app:app --reload --port 8000
 
 | Role | Username | Password |
 |---|---|---|
-| **Admin** | `admin` | `admin123` |
-| **Owner** | `owner` | `owner123` |
-| **Store** | `store` | `store123` |
-| **Floor Supervisor** | `supervisor` | `super123` |
-| **QC Officer** | `qc_officer` | `qc1234` |
-| **Office** | `office` | `office123` |
+| **Admin** | `admin` | `khadira2026!` |
+| **Owner** | `owner` | `khadira2026!` |
+| **Store** | `store` | `khadira2026!` |
+| **Floor Supervisor** | `floor_supervisor` | `khadira2026!` |
+| **QC Officer** | `qc` | `khadira2026!` |
+| **Office** | `office` | `khadira2026!` |
 
 ### 2. Frontend
 
@@ -76,7 +79,7 @@ npm run dev
 
 ## 🧪 Testing
 
-The backend includes a comprehensive, 18-flow automated test suite covering edge cases, race conditions, and complete production cycles.
+The active backend suite covers health checks, authentication, purchasing, sales orders, inventory, production, QC, and dispatch. The previous implementation's tests are retained in `backend/legacy/` as references.
 
 ```bash
 cd backend
