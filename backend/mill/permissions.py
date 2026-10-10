@@ -58,6 +58,7 @@ ROLES: dict[str, dict] = {
             "dispatch.read", "dispatch.write",
             "finance.read", "finance.write",
             "reports.read",
+            "production.read", "rolls.read", "machines.read",
             "wages.read", "wages.write", "wages.finalise",
             "costing.read", "costing.write",
         ],
