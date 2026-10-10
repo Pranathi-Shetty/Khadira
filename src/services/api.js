@@ -1,12 +1,14 @@
 /**
  * Khadira ERP API Client
- * Connects frontend landing page & consoles directly to the FastAPI backend (khadira-2/backend)
+ * Centralized API client connected directly to the FastAPI + SQLite backend.
+ * Reads base URL from import.meta.env.VITE_API_BASE_URL (defaults to '/api').
  */
 
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
-async function request(endpoint, options = {}) {
-  const url = `${API_BASE}${endpoint}`;
+export async function apiRequest(endpoint, options = {}) {
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = `${API_BASE}${cleanEndpoint}`;
   const headers = {
     'Accept': 'application/json',
     ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
@@ -17,7 +19,7 @@ async function request(endpoint, options = {}) {
     const res = await fetch(url, {
       ...options,
       headers,
-      credentials: 'include', // sends and receives the mill_session HTTP cookie
+      credentials: 'include', // Sends & receives mill_session cookie
     });
 
     if (res.status === 204) {
@@ -41,11 +43,56 @@ async function request(endpoint, options = {}) {
   }
 }
 
+// Typed generic CRUD helpers
+export const apiClient = {
+  async getList(resource, params = {}) {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        searchParams.append(k, String(v));
+      }
+    });
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return apiRequest(`/${resource}${query}`);
+  },
+
+  async getById(resource, id) {
+    return apiRequest(`/${resource}/${id}`);
+  },
+
+  async create(resource, data) {
+    return apiRequest(`/${resource}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async update(resource, id, data) {
+    return apiRequest(`/${resource}/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async remove(resource, id) {
+    return apiRequest(`/${resource}/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 export const MillAPI = {
+  // Generic CRUD pass-through
+  getList: apiClient.getList,
+  getById: apiClient.getById,
+  create: apiClient.create,
+  update: apiClient.update,
+  remove: apiClient.remove,
+
   // --- Meta & Health ---
   async checkHealth() {
     try {
-      const res = await request('/health');
+      const res = await apiRequest('/health');
       return { online: res?.status === 'ok', app: res?.app || 'Khadira' };
     } catch {
       return { online: false, app: 'Offline' };
@@ -54,97 +101,118 @@ export const MillAPI = {
 
   // --- Auth ---
   async login(username, password) {
-    return request('/auth/login', {
+    return apiRequest('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     });
   },
 
   async logout() {
-    return request('/auth/logout', {
+    return apiRequest('/auth/logout', {
       method: 'POST',
     });
   },
 
   async getMe() {
-    return request('/auth/me');
+    return apiRequest('/auth/me');
   },
 
   // --- Dashboard Metrics ---
   async getDashboard() {
-    return request('/dashboard');
+    return apiRequest('/dashboard');
   },
 
   // --- Inventory & Items ---
   async getItems(itemType = null, q = '') {
-    const params = new URLSearchParams();
-    if (itemType) params.append('item_type', itemType);
-    if (q) params.append('q', q);
-    const queryStr = params.toString() ? `?${params.toString()}` : '';
-    return request(`/items${queryStr}`);
+    const params = {};
+    if (itemType) params.item_type = itemType;
+    if (q) params.q = q;
+    return apiClient.getList('items', params);
+  },
+
+  async createItem(itemData) {
+    return apiClient.create('items', itemData);
+  },
+
+  async updateItem(itemId, itemData) {
+    return apiClient.update('items', itemId, itemData);
   },
 
   // --- Machine Telemetry ---
   async getMachines() {
-    return request('/machines');
+    return apiRequest('/machines');
   },
 
   async createMachine(code, name, machineType) {
-    return request('/machines', {
+    return apiRequest('/machines', {
       method: 'POST',
       body: JSON.stringify({ code, name, machine_type: machineType }),
     });
   },
 
-  // --- Orders ---
-  async getOrders(status = null) {
-    const query = status ? `?status=${encodeURIComponent(status)}` : '';
-    return request(`/orders${query}`);
+  // --- Sales Orders ---
+  async getOrders(status = null, q = '') {
+    const params = {};
+    if (status) params.status = status;
+    if (q) params.q = q;
+    return apiClient.getList('orders', params);
+  },
+
+  async createOrder(orderData) {
+    return apiClient.create('orders', orderData);
   },
 
   async confirmOrder(orderId) {
-    return request(`/orders/${orderId}/confirm`, {
+    return apiRequest(`/orders/${orderId}/confirm`, {
       method: 'POST',
     });
   },
 
   async cancelOrder(orderId) {
-    return request(`/orders/${orderId}/cancel`, {
+    return apiRequest(`/orders/${orderId}/cancel`, {
       method: 'POST',
     });
   },
 
   // --- Production Runs & Looms ---
-  async getProductionRuns() {
-    return request('/production');
+  async getProductionRuns(status = null) {
+    const params = status ? { status } : {};
+    return apiClient.getList('production', params);
   },
 
-  async advanceProduction(runId, meters, yarnKg = null) {
-    return request(`/production/${runId}/advance`, {
+  async startProductionRun(machineId, itemId, orderId = null) {
+    return apiRequest('/production', {
       method: 'POST',
-      body: JSON.stringify({ meters, yarn_kg: yarnKg }),
+      body: JSON.stringify({ machine_id: machineId, item_id: itemId, order_id: orderId }),
+    });
+  },
+
+  async advanceProduction(runId, yarnKg = null) {
+    return apiRequest(`/production/${runId}/advance`, {
+      method: 'POST',
+      body: JSON.stringify({ yarn_kg: yarnKg }),
     });
   },
 
   // --- Fabric Rolls & Quality Control ---
   async getRolls(status = null) {
-    const query = status ? `?status=${encodeURIComponent(status)}` : '';
-    return request(`/rolls${query}`);
+    const params = status ? { status } : {};
+    return apiClient.getList('rolls', params);
   },
 
   async getPendingQC() {
-    return request('/qc/pending');
+    return apiRequest('/qc/pending');
   },
 
   async inspectRoll(rollId, verdict, grade = 'A', note = '') {
-    return request(`/rolls/${rollId}/inspect`, {
+    return apiRequest(`/rolls/${rollId}/inspect`, {
       method: 'POST',
       body: JSON.stringify({ verdict, grade, note }),
     });
   },
 
   async moveRollToStore(rollId) {
-    return request(`/rolls/${rollId}/store`, {
+    return apiRequest(`/rolls/${rollId}/store`, {
       method: 'POST',
     });
   },
@@ -200,12 +268,13 @@ export const MillAPI = {
   },
 
   // --- Finance & Invoices ---
-  async getInvoices() {
-    return request('/finance/invoices');
+  async getInvoices(invType = null) {
+    const params = invType ? { inv_type: invType } : {};
+    return apiRequest(`/finance/invoices${invType ? `?inv_type=${invType}` : ''}`);
   },
 
   async payInvoice(invId, amountPaise, method = 'bank') {
-    return request(`/finance/invoices/${invId}/pay`, {
+    return apiRequest(`/finance/invoices/${invId}/pay`, {
       method: 'POST',
       body: JSON.stringify({ amount_paise: amountPaise, method }),
     });
@@ -213,21 +282,61 @@ export const MillAPI = {
 
   // --- Purchasing & POs ---
   async getPurchasing() {
-    return request('/purchasing');
+    return apiRequest('/purchasing');
+  },
+
+  async createPO(poData) {
+    return apiRequest('/purchasing', {
+      method: 'POST',
+      body: JSON.stringify(poData),
+    });
+  },
+
+  async confirmPO(poId) {
+    return apiRequest(`/purchasing/${poId}/confirm`, {
+      method: 'POST',
+    });
+  },
+
+  async cancelPO(poId) {
+    return apiRequest(`/purchasing/${poId}/cancel`, {
+      method: 'POST',
+    });
+  },
+
+  async receivePOYarn(poId, receiptData) {
+    return apiRequest(`/purchasing/${poId}/receive`, {
+      method: 'POST',
+      body: JSON.stringify(receiptData),
+    });
   },
 
   // --- Partners ---
-  async getSuppliers() {
-    return request('/partners/suppliers');
+  async getSuppliers(q = '') {
+    return apiClient.getList('partners/suppliers', { q });
   },
 
-  async getBuyers() {
-    return request('/partners/buyers');
+  async createSupplier(data) {
+    return apiRequest('/partners/suppliers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getBuyers(q = '') {
+    return apiClient.getList('partners/buyers', { q });
+  },
+
+  async createBuyer(data) {
+    return apiRequest('/partners/buyers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 
   // --- Settings ---
   async getSettings() {
-    return request('/settings');
+    return apiRequest('/settings');
   },
 };
 
