@@ -2340,7 +2340,7 @@ export default function App() {
                                     const rate = line.rate_per_meter_paise ? (line.rate_per_meter_paise / 100).toFixed(0) : '85';
                                     return (
                                       <tr key={ord.id}>
-                                        <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#f4f4f5' }}>
+                                        <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#0F172A' }}>
                                           {ord.ref || `ORD-${ord.id}`}
                                         </td>
                                         <td>{ord.buyer_name || 'Buyer'}</td>

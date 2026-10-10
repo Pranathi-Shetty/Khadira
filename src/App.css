@@ -2653,7 +2653,7 @@
   min-height: 100vh;
   background-color: var(--bg-page, #F7F3EC);
   background-image: 
-    linear-gradient(rgba(247, 243, 236, 0.5), rgba(247, 243, 236, 0.5)),
+    linear-gradient(rgba(247, 243, 236, 0.6), rgba(247, 243, 236, 0.6)),
     url('/assets/images/dashboard-damask-bg.jpg');
   background-repeat: repeat;
   background-size: 380px auto;
