@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from mill.database import get_db
 from mill.models import User, UserRole
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "everest-textile-dev-secret-change-in-production")
+SECRET_KEY = os.environ.get("SECRET_KEY", "khadira-textile-dev-secret-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 12   # 12 hours
 

@@ -45,8 +45,17 @@ import {
   ChevronsUpDown,
   LogOut
 } from 'lucide-react';
+import {
+  Sun,
+  Moon,
+  Bell,
+  Calendar,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
 import MillAPI from './services/api';
 import './App.css';
+import './everest-erp.css';
 
 // =====================================================================
 // USER PROVIDED ARTISAN TEXTILE & TACTILE CRAFT ASSETS
@@ -324,6 +333,60 @@ const FAQS = [
   }
 ];
 
+
+// =====================================================================
+// KHADIRA TEXTILE MILLS DATA & VISUAL CONSTANTS
+// =====================================================================
+const KhadiraLogo = () => (
+  <svg width="34" height="26" viewBox="0 0 40 28" fill="none" xmlns="http://www.w3.org/2000/svg" className="everest-logo-svg">
+    <polygon points="12,3 1,26 23,26" fill="#FFFFFF" />
+    <polygon points="12,3 7,14 13,12 18,15" fill="#CBD5E1" />
+    <polygon points="26,8 15,26 37,26" fill="#FFFFFF" fillOpacity="0.95" />
+    <polygon points="26,8 21,17 26,15 31,18" fill="#94A3B8" />
+  </svg>
+);
+
+const MILL_FLOW_STEPS = [
+  { step: 1, name: 'Yarn', status: 'Materials Ready', qty: '12.8 Tons', tint: 'green', image: '/assets/images/yarn-cones.jpg' },
+  { step: 2, name: 'Weaving', status: 'In Production', qty: '8,240 m', tint: 'blue', image: '/assets/images/weaving-loom.jpg' },
+  { step: 3, name: 'Dyeing', status: 'In Progress', qty: '2,300 m', tint: 'red', image: '/assets/images/dyeing-fabric.jpg' },
+  { step: 4, name: 'Finishing', status: 'Completed Today', qty: '1,860 m', tint: 'blue', image: '/assets/images/finishing-fabric.jpg' },
+  { step: 5, name: 'Dispatch', status: 'Ready to Ship', qty: '1,420 m', tint: 'orange', image: '/assets/images/dispatch-boxes.jpg' },
+];
+
+const MACHINE_STATUS_LIST = [
+  { id: 'W01', name: 'Weaving - W01', status: 'Running', statusType: 'green', util: '85%', image: '/assets/images/machine-loom.jpg', sparkline: 'M2 18 C 14 14, 22 8, 32 16 C 42 22, 50 6, 62 8' },
+  { id: 'W02', name: 'Weaving - W02', status: 'Idle', statusType: 'orange', util: '0%', image: '/assets/images/machine-loom.jpg', sparkline: 'M2 14 C 12 18, 22 22, 34 14 C 44 8, 52 18, 62 14' },
+  { id: 'D01', name: 'Dyeing - D01', status: 'Running', statusType: 'green', util: '72%', image: '/assets/images/machine-dyeing.jpg', sparkline: 'M2 18 C 14 14, 22 8, 32 16 C 42 22, 50 6, 62 8' },
+  { id: 'F01', name: 'Finishing - F01', status: 'Maintenance', statusType: 'red', util: '0%', image: '/assets/images/machine-finishing.jpg', sparkline: 'M2 18 C 16 18, 30 20, 44 20 C 52 20, 58 20, 62 20' },
+];
+
+const ORDERS_AT_A_GLANCE = [
+  { id: 'ORD-1024', fabric: 'Cotton Poplin', qty: '5,000 m', progress: 72, progressColor: '#2563EB', delivery: '13 Oct', status: 'On track', statusColor: 'green' },
+  { id: 'ORD-1025', fabric: 'Polyester Blend', qty: '3,200 m', progress: 40, progressColor: '#F59E0B', delivery: '15 Oct', status: 'At risk', statusColor: 'orange' },
+  { id: 'ORD-1026', fabric: 'Dyed Cotton', qty: '8,000 m', progress: 90, progressColor: '#10B981', delivery: '10 Oct', status: 'On track', statusColor: 'green' },
+  { id: 'ORD-1027', fabric: 'Linen Blend', qty: '2,500 m', progress: 25, progressColor: '#EF4444', delivery: '12 Oct', status: 'Delayed', statusColor: 'red' },
+];
+
+const QC_STATS = {
+  inspectedRolls: 146,
+  passed: 135,
+  passedPct: '92.4%',
+  rework: 8,
+  reworkPct: '5.5%',
+  rejected: 3,
+  rejectedPct: '2.1%',
+};
+
+const YARN_DONUT_DATA = [
+  { label: 'Cotton', pct: 42, color: '#2563EB', strokeDash: '185 255', strokeOffset: '0' },
+  { label: 'Polyester', pct: 22, color: '#F87171', strokeDash: '97 343', strokeOffset: '-185' },
+  { label: 'Viscose', pct: 15, color: '#F59E0B', strokeDash: '66 374', strokeOffset: '-282' },
+  { label: 'Acrylic', pct: 8, color: '#60A5FA', strokeDash: '35 405', strokeOffset: '-348' },
+  { label: 'Blended', pct: 10, color: '#4F46E5', strokeDash: '44 396', strokeOffset: '-383' },
+  { label: 'Others', pct: 3, color: '#94A3B8', strokeDash: '13 427', strokeOffset: '-427' },
+];
+
 export default function App() {
   // Navigation & Header
   const [scrolled, setScrolled] = useState(false);
@@ -393,6 +456,47 @@ export default function App() {
 
   // Modern ERP Sidebar & View State (like erp-otw7.vercel.app)
   const [erpSidebarTab, setErpSidebarTab] = useState('dashboard');
+  // Interactive UI states for Khadira theme matching reference
+  const [currentShift, setCurrentShift] = useState('Day Shift (6 AM - 2 PM)');
+  const [isShiftOpen, setIsShiftOpen] = useState(false);
+  const [dateRangeFilter, setDateRangeFilter] = useState('This Month');
+  const [isDateRangeOpen, setIsDateRangeOpen] = useState(false);
+  const [chartWeekFilter, setChartWeekFilter] = useState('This Week');
+  const [isChartWeekOpen, setIsChartWeekOpen] = useState(false);
+  const [yarnTypeFilter, setYarnTypeFilter] = useState('View All');
+  const [isYarnTypeOpen, setIsYarnTypeOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isLightMode, setIsLightMode] = useState(true);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isProductionSubmenuOpen, setIsProductionSubmenuOpen] = useState(false);
+  const [hoveredTrendIndex, setHoveredTrendIndex] = useState(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const getGreeting = () => {
+    const h = currentTime.getHours();
+    if (h < 12) return 'Good Morning';
+    if (h < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  };
+
+  const formattedDate = currentTime.toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
+
+  const formattedTime = currentTime.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isRoleMenuOpen, setIsRoleMenuOpen] = useState(false);
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
@@ -1009,13 +1113,6 @@ export default function App() {
     });
   }, [liveOrders, dashboardSearch]);
 
-  // Helpers for modern ERP dashboard (like erp-otw7.vercel.app)
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  };
 
   const getBreadcrumb = () => {
     switch (erpSidebarTab) {
@@ -1106,272 +1203,343 @@ export default function App() {
     <div className="app-wrapper">
       {isDashboardOpen ? (
         <main className="erp-app-shell">
-          {/* 1. LEFT FIXED SIDEBAR (260px / Collapsible to 72px) */}
-          <aside className={`erp-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
-            {/* Top Brand Block */}
+          {/* Mobile Sidebar Backdrop */}
+          {isMobileNavOpen && (
             <div 
-              className="erp-brand-header clickable"
+              className="erp-sidebar-backdrop" 
+              onClick={() => setIsMobileNavOpen(false)} 
+            />
+          )}
+
+          {/* 1. KHADIRA DEEP NAVY BLUE SIDEBAR (260px, sticky, textured overlay) */}
+          <aside className={`erp-sidebar ${isSidebarCollapsed ? 'collapsed' : ''} ${isMobileNavOpen ? 'mobile-open' : ''}`}>
+            {/* Top: Mountain mark logo + KHADIRA + TEXTILE MILLS */}
+            <div 
+              className="erp-brand-header"
               onClick={() => setIsDashboardOpen(false)}
-              style={{ cursor: 'pointer' }}
               title="Return to Khadira Landing Page"
             >
-              <div className="erp-brand-logo-sq">E</div>
-              <div className="erp-brand-text">
-                <span className="erp-brand-title">Everest Textile Mills</span>
-                <span className="erp-brand-sub">Textile Operations ERP</span>
+              <div className="everest-logo-wrap">
+                <KhadiraLogo />
+              </div>
+              <div className="everest-brand-text">
+                <span className="everest-brand-title">KHADIRA</span>
+                <span className="everest-brand-sub">TEXTILE MILLS</span>
               </div>
             </div>
 
-            {/* Navigation Groups */}
-            <div className="erp-nav-scroll">
-              {/* Group: Overview */}
-              <div className="erp-nav-group">
-                <span className="erp-nav-heading">Overview</span>
-                <button
-                  type="button"
-                  className={`erp-nav-item ${erpSidebarTab === 'dashboard' ? 'active' : ''}`}
-                  onClick={() => setErpSidebarTab('dashboard')}
-                >
-                  <LayoutDashboard size={17} />
-                  <span>Dashboard</span>
-                </button>
-                <button
-                  type="button"
-                  className={`erp-nav-item ${erpSidebarTab === 'reports' ? 'active' : ''}`}
-                  onClick={() => setErpSidebarTab('reports')}
-                >
-                  <BarChart3 size={17} />
-                  <span>Reports</span>
-                </button>
-              </div>
-
-              {/* Group: Sales */}
-              <div className="erp-nav-group">
-                <span className="erp-nav-heading">Sales</span>
-                <button
-                  type="button"
-                  className={`erp-nav-item ${erpSidebarTab === 'sales-orders' ? 'active' : ''}`}
-                  onClick={() => setErpSidebarTab('sales-orders')}
-                >
-                  <ShoppingCart size={17} />
-                  <span>Sales orders</span>
-                </button>
-                <button
-                  type="button"
-                  className={`erp-nav-item ${erpSidebarTab === 'customers' ? 'active' : ''}`}
-                  onClick={() => setErpSidebarTab('customers')}
-                >
-                  <Users size={17} />
-                  <span>Customers</span>
-                </button>
-                <button
-                  type="button"
-                  className={`erp-nav-item ${erpSidebarTab === 'promotions' ? 'active' : ''}`}
-                  onClick={() => setErpSidebarTab('promotions')}
-                >
-                  <Tag size={17} />
-                  <span>Promotions</span>
-                </button>
-              </div>
-
-              {/* Group: Purchasing */}
-              <div className="erp-nav-group">
-                <span className="erp-nav-heading">Purchasing</span>
-                <button
-                  type="button"
-                  className={`erp-nav-item ${erpSidebarTab === 'purchases' ? 'active' : ''}`}
-                  onClick={() => setErpSidebarTab('purchases')}
-                >
-                  <Truck size={17} />
-                  <span>Purchase orders</span>
-                </button>
-                <button
-                  type="button"
-                  className={`erp-nav-item ${erpSidebarTab === 'suppliers' ? 'active' : ''}`}
-                  onClick={() => setErpSidebarTab('suppliers')}
-                >
-                  <Building2 size={17} />
-                  <span>Suppliers</span>
-                </button>
-              </div>
-
-              {/* Group: Inventory */}
-              <div className="erp-nav-group">
-                <span className="erp-nav-heading">Inventory</span>
-                <button
-                  type="button"
-                  className={`erp-nav-item ${erpSidebarTab === 'inventory' ? 'active' : ''}`}
-                  onClick={() => setErpSidebarTab('inventory')}
-                >
-                  <Boxes size={17} />
-                  <span>Products</span>
-                </button>
-                <button
-                  type="button"
-                  className={`erp-nav-item ${erpSidebarTab === 'stock-levels' ? 'active' : ''}`}
-                  onClick={() => setErpSidebarTab('stock-levels')}
-                >
-                  <Package size={17} />
-                  <span>Stock levels</span>
-                </button>
-                <button
-                  type="button"
-                  className={`erp-nav-item ${erpSidebarTab === 'transfers' ? 'active' : ''}`}
-                  onClick={() => setErpSidebarTab('transfers')}
-                >
-                  <ArrowLeftRight size={17} />
-                  <span>Transfers</span>
-                </button>
-                <button
-                  type="button"
-                  className={`erp-nav-item ${erpSidebarTab === 'stock-counts' ? 'active' : ''}`}
-                  onClick={() => setErpSidebarTab('stock-counts')}
-                >
-                  <ClipboardList size={17} />
-                  <span>Stock counts</span>
-                </button>
-              </div>
-
-              {/* Group: Operations */}
-              <div className="erp-nav-group">
-                <span className="erp-nav-heading">Operations</span>
-                <button
-                  type="button"
-                  className={`erp-nav-item ${erpSidebarTab === 'machines' ? 'active' : ''}`}
-                  onClick={() => setErpSidebarTab('machines')}
-                >
-                  <Activity size={17} />
-                  <span>Machines & Looms</span>
-                </button>
-                <button
-                  type="button"
-                  className={`erp-nav-item ${erpSidebarTab === 'rolls-qc' ? 'active' : ''}`}
-                  onClick={() => setErpSidebarTab('rolls-qc')}
-                >
-                  <ShieldCheck size={17} />
-                  <span>Fabric Rolls & QC</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Pinned User Card at Bottom */}
-            <div className="erp-sidebar-user">
+            {/* Nav items in exact specified order:
+                Dashboard, Yarn & Materials, Production (with chevron/submenu),
+                Machines, Quality Control, Inventory, Orders, Dispatch, Workforce, Finance, Reports */}
+            <nav className="erp-nav-scroll" aria-label="Main Navigation">
+              {/* 1. Dashboard */}
               <button
                 type="button"
-                className="erp-user-pill"
-                onClick={() => setIsRoleMenuOpen(!isRoleMenuOpen)}
-                title="Switch Role or Profile"
+                className={`erp-nav-item ${erpSidebarTab === 'dashboard' ? 'active' : ''}`}
+                onClick={() => { setErpSidebarTab('dashboard'); setIsMobileNavOpen(false); }}
               >
-                <div className="erp-user-avatar">FS</div>
-                <div className="erp-user-info">
-                  <span className="erp-user-name">floor_supervisor</span>
-                  <span className="erp-user-role">Production Supervisor</span>
-                </div>
-                <ChevronsUpDown size={15} className="erp-user-toggle-icon" />
+                <LayoutDashboard size={18} />
+                <span>Dashboard</span>
               </button>
 
-              {isRoleMenuOpen && (
-                <div className="erp-role-dropdown">
-                  <div className="erp-role-dropdown-header">Switch Role Profile</div>
-                  {Object.keys(ROLE_CONFIG).map((role) => (
-                    <button
-                      key={role}
-                      type="button"
-                      className={`erp-role-dropdown-item ${dashboardRole === role ? 'active' : ''}`}
-                      onClick={() => {
-                        setDashboardRole(role);
-                        setIsRoleMenuOpen(false);
-                        setToastMessage(`Switched role profile to ${role}`);
-                      }}
+              {/* 2. Yarn & Materials */}
+              <button
+                type="button"
+                className={`erp-nav-item ${erpSidebarTab === 'inventory' ? 'active' : ''}`}
+                onClick={() => { setErpSidebarTab('inventory'); setIsMobileNavOpen(false); }}
+              >
+                <Package size={18} />
+                <span>Yarn & Materials</span>
+              </button>
+
+              {/* 3. Production (with chevron/submenu) */}
+              <div>
+                <button
+                  type="button"
+                  className={`erp-nav-item ${['machines', 'production-sub'].includes(erpSidebarTab) ? 'active' : ''}`}
+                  onClick={() => setIsProductionSubmenuOpen(!isProductionSubmenuOpen)}
+                >
+                  <Factory size={18} />
+                  <span>Production</span>
+                  <ChevronRight size={15} className={`erp-nav-chevron ${isProductionSubmenuOpen ? 'rotated' : ''}`} />
+                </button>
+                {isProductionSubmenuOpen && (
+                  <div className="erp-nav-submenu">
+                    <button 
+                      type="button" 
+                      className={`erp-nav-subitem ${erpSidebarTab === 'machines' ? 'active' : ''}`}
+                      onClick={() => { setErpSidebarTab('machines'); setIsMobileNavOpen(false); }}
                     >
-                      <span className="erp-role-dot" />
-                      <span>{role}</span>
+                      • Weaving Looms
                     </button>
-                  ))}
-                  <div className="erp-role-divider" />
-                  <button
-                    type="button"
-                    className="erp-role-dropdown-item signout"
-                    onClick={() => {
-                      setIsRoleMenuOpen(false);
-                      handleTerminalLogout(true);
-                    }}
-                  >
-                    <LogOut size={13} />
-                    <span>Sign Out</span>
-                  </button>
-                </div>
-              )}
+                    <button 
+                      type="button" 
+                      className={`erp-nav-subitem ${erpSidebarTab === 'rolls-qc' ? 'active' : ''}`}
+                      onClick={() => { setErpSidebarTab('rolls-qc'); setIsMobileNavOpen(false); }}
+                    >
+                      • Rolls & Batches
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* 4. Machines */}
+              <button
+                type="button"
+                className={`erp-nav-item ${erpSidebarTab === 'machines' && !isProductionSubmenuOpen ? 'active' : ''}`}
+                onClick={() => { setErpSidebarTab('machines'); setIsMobileNavOpen(false); }}
+              >
+                <Activity size={18} />
+                <span>Machines</span>
+              </button>
+
+              {/* 5. Quality Control */}
+              <button
+                type="button"
+                className={`erp-nav-item ${erpSidebarTab === 'rolls-qc' ? 'active' : ''}`}
+                onClick={() => { setErpSidebarTab('rolls-qc'); setIsMobileNavOpen(false); }}
+              >
+                <ShieldCheck size={18} />
+                <span>Quality Control</span>
+              </button>
+
+              {/* 6. Inventory */}
+              <button
+                type="button"
+                className={`erp-nav-item ${erpSidebarTab === 'stock-levels' ? 'active' : ''}`}
+                onClick={() => { setErpSidebarTab('stock-levels'); setIsMobileNavOpen(false); }}
+              >
+                <Boxes size={18} />
+                <span>Inventory</span>
+              </button>
+
+              {/* 7. Orders */}
+              <button
+                type="button"
+                className={`erp-nav-item ${erpSidebarTab === 'sales-orders' ? 'active' : ''}`}
+                onClick={() => { setErpSidebarTab('sales-orders'); setIsMobileNavOpen(false); }}
+              >
+                <FileText size={18} />
+                <span>Orders</span>
+              </button>
+
+              {/* 8. Dispatch */}
+              <button
+                type="button"
+                className={`erp-nav-item ${erpSidebarTab === 'transfers' ? 'active' : ''}`}
+                onClick={() => { setErpSidebarTab('transfers'); setIsMobileNavOpen(false); }}
+              >
+                <Truck size={18} />
+                <span>Dispatch</span>
+              </button>
+
+              {/* 9. Workforce */}
+              <button
+                type="button"
+                className={`erp-nav-item ${erpSidebarTab === 'customers' ? 'active' : ''}`}
+                onClick={() => { setErpSidebarTab('customers'); setIsMobileNavOpen(false); }}
+              >
+                <Users size={18} />
+                <span>Workforce</span>
+              </button>
+
+              {/* 10. Finance */}
+              <button
+                type="button"
+                className={`erp-nav-item ${erpSidebarTab === 'purchases' ? 'active' : ''}`}
+                onClick={() => { setErpSidebarTab('purchases'); setIsMobileNavOpen(false); }}
+              >
+                <Coins size={18} />
+                <span>Finance</span>
+              </button>
+
+              {/* 11. Reports */}
+              <button
+                type="button"
+                className={`erp-nav-item ${erpSidebarTab === 'reports' ? 'active' : ''}`}
+                onClick={() => { setErpSidebarTab('reports'); setIsMobileNavOpen(false); }}
+              >
+                <BarChart3 size={18} />
+                <span>Reports</span>
+              </button>
+            </nav>
+
+            {/* Bottom: Tagline + Divider + Motto */}
+            <div className="erp-sidebar-footer">
+              <span className="erp-sidebar-tagline">From Thread to Tomorrow</span>
+              <div className="erp-sidebar-divider" />
+              <span className="erp-sidebar-motto">Quality • Productivity • Growth</span>
             </div>
           </aside>
 
-          {/* 2. MAIN WORKSPACE WITH INDEPENDENT SCROLL */}
+          {/* 2. MAIN WORKSPACE WITH TOPBAR & SCROLL CANVAS */}
           <section className="erp-main-area">
-            {/* Top Workspace Header Bar (56-64px) */}
+            {/* Light Top Bar (64px) */}
             <header className="erp-topbar">
               <div className="erp-topbar-left">
                 <button
                   type="button"
-                  className="erp-collapse-btn"
-                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                  title="Toggle Sidebar Width"
+                  className="erp-mobile-menu-btn"
+                  onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
+                  aria-label="Toggle mobile menu"
                 >
-                  <PanelLeft size={17} />
+                  <Menu size={18} />
                 </button>
-                <div className="erp-breadcrumb">
-                  {getBreadcrumb()}
+                <div className="erp-search-pill">
+                  <Search size={16} className="erp-search-icon" />
+                  <input
+                    type="text"
+                    placeholder="Search orders, yarn lots, rolls, machines..."
+                    value={dashboardSearch}
+                    onChange={(e) => setDashboardSearch(e.target.value)}
+                    className="erp-search-input"
+                  />
                 </div>
               </div>
 
               <div className="erp-topbar-right">
+                {/* Sun/Moon Theme Toggle */}
                 <button
                   type="button"
-                  className="erp-btn-landing-tab"
-                  onClick={() => setIsDashboardOpen(false)}
-                  title="Return to Khadira Landing Page"
-                  id="btn-back-to-landing"
+                  className="erp-theme-toggle-btn"
+                  onClick={() => setIsLightMode(!isLightMode)}
+                  title="Toggle Light Theme"
                 >
-                  <ArrowLeft size={14} />
-                  <span>Landing page</span>
+                  {isLightMode ? <Sun size={17} /> : <Moon size={17} />}
                 </button>
-                <button
-                  type="button"
-                  className="erp-btn-primary"
-                  onClick={() => {
-                    setCreateModalType('order');
-                    setIsCreateModalOpen(true);
-                  }}
-                >
-                  <Plus size={15} />
-                  <span>New sales order</span>
-                </button>
-                <button
-                  type="button"
-                  className="erp-btn-secondary"
-                  onClick={() => {
-                    setCreateModalType('purchase');
-                    setIsCreateModalOpen(true);
-                  }}
-                >
-                  <Plus size={15} />
-                  <span>New purchase order</span>
-                </button>
-                <button
-                  type="button"
-                  className="erp-btn-icon"
-                  onClick={fetchAllLiveData}
-                  title="Refresh & sync live backend database"
-                >
-                  <RefreshCw size={15} className={isFetchingData ? 'spin-icon' : ''} />
-                </button>
-                <button
-                  type="button"
-                  className="erp-btn-icon"
-                  onClick={() => handleTerminalLogout(true)}
-                  title="Sign Out"
-                >
-                  <LogOut size={15} />
-                </button>
+
+                {/* Shift Selector Dropdown */}
+                <div className="erp-dropdown-wrap">
+                  <button
+                    type="button"
+                    className="erp-shift-pill"
+                    onClick={() => setIsShiftOpen(!isShiftOpen)}
+                  >
+                    <span>{currentShift}</span>
+                    <ChevronDown size={14} />
+                  </button>
+                  {isShiftOpen && (
+                    <div className="erp-dropdown-menu">
+                      {['Day Shift (6 AM - 2 PM)', 'Evening Shift (2 PM - 10 PM)', 'Night Shift (10 PM - 6 AM)'].map((shift) => (
+                        <button
+                          key={shift}
+                          type="button"
+                          className={`erp-dropdown-item ${currentShift === shift ? 'selected' : ''}`}
+                          onClick={() => {
+                            setCurrentShift(shift);
+                            setIsShiftOpen(false);
+                            setToastMessage(`Switched active view to ${shift}`);
+                          }}
+                        >
+                          {shift}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Notification Bell with Red Badge */}
+                <div className="erp-dropdown-wrap">
+                  <button
+                    type="button"
+                    className="erp-notif-btn"
+                    onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                    title="Mill Notifications"
+                  >
+                    <Bell size={18} />
+                    <span className="erp-notif-badge">3</span>
+                  </button>
+                  {isNotificationOpen && (
+                    <div className="erp-dropdown-menu erp-notif-dropdown">
+                      <div className="erp-notif-header">Mill Operations Alerts (3)</div>
+                      <div className="erp-notif-item">
+                        <span className="erp-notif-dot red" />
+                        <div className="erp-notif-content">
+                          <strong>Roll #R-1092</strong>
+                          <span>Awaiting ASTM 4-point QC lab test</span>
+                        </div>
+                      </div>
+                      <div className="erp-notif-item">
+                        <span className="erp-notif-dot green" />
+                        <div className="erp-notif-content">
+                          <strong>Loom W01</strong>
+                          <span>Target 8,240m achieved for Day Shift</span>
+                        </div>
+                      </div>
+                      <div className="erp-notif-item">
+                        <span className="erp-notif-dot orange" />
+                        <div className="erp-notif-content">
+                          <strong>Yarn Lot #YRN-20-W</strong>
+                          <span>Arrived at Warehouse Gate 2</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* User Block with Avatar & Chevron */}
+                <div className="erp-dropdown-wrap">
+                  <button
+                    type="button"
+                    className="erp-user-block"
+                    onClick={() => setIsRoleMenuOpen(!isRoleMenuOpen)}
+                  >
+                    <div className="erp-user-avatar-circle">
+                      <img 
+                        src="/images/teams/production-supervisor.jpg" 
+                        alt="User" 
+                        onError={(e) => { 
+                          e.target.style.display = 'none'; 
+                          if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'; 
+                        }} 
+                      />
+                      <span className="erp-avatar-fallback">P</span>
+                    </div>
+                    <div className="erp-user-details">
+                      <span className="erp-user-fullname">{loggedInUser?.full_name?.split(' ')[0] || 'Pranathi'}</span>
+                      <span className="erp-user-role-label">{loggedInUser?.role === 'admin' ? 'Admin' : 'Admin'}</span>
+                    </div>
+                    <ChevronDown size={14} className="erp-user-chevron" />
+                  </button>
+                  {isRoleMenuOpen && (
+                    <div className="erp-dropdown-menu right-aligned">
+                      <div className="erp-notif-header">Switch Role Profile</div>
+                      {Object.keys(ROLE_CONFIG).map((role) => (
+                        <button
+                          key={role}
+                          type="button"
+                          className={`erp-dropdown-item ${dashboardRole === role ? 'selected' : ''}`}
+                          onClick={() => {
+                            setDashboardRole(role);
+                            setIsRoleMenuOpen(false);
+                            setToastMessage(`Switched role profile to ${role}`);
+                          }}
+                        >
+                          {role}
+                        </button>
+                      ))}
+                      <div style={{ height: '1px', background: '#F0ECE4', margin: '4px 0' }} />
+                      <button
+                        type="button"
+                        className="erp-dropdown-item"
+                        style={{ color: '#EF4444' }}
+                        onClick={() => {
+                          setIsRoleMenuOpen(false);
+                          handleTerminalLogout(true);
+                        }}
+                      >
+                        <LogOut size={13} />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Far Right: Live Date & Time */}
+                <div className="erp-live-datetime">
+                  <span className="erp-live-date">{formattedDate}</span>
+                  <span className="erp-live-time">{formattedTime}</span>
+                </div>
               </div>
             </header>
 
@@ -1380,289 +1548,647 @@ export default function App() {
               <div className="erp-container">
                 {erpSidebarTab === 'dashboard' ? (
                   <>
-                    {/* Page Header: Greeting + Subtitle + Date Selector */}
-                    <div className="erp-page-header">
-                      <div className="erp-page-title-group">
-                        <h1 className="erp-page-title">
-                          Good evening, {loggedInUser?.username || 'floor_supervisor'}
+                    {/* 1. HERO HEADER BANNER (Soft Draped Textile Silk Folds Background) */}
+                    <div className="erp-hero-banner">
+                      <div className="erp-hero-content">
+                        <h1 className="erp-hero-greeting">
+                          {getGreeting()}, {loggedInUser?.full_name?.split(' ')[0] || 'Pranathi'}
                         </h1>
-                        <p className="erp-page-subtitle">
-                          Production floor and textile mill operations over the last 30 days.
+                        <p className="erp-hero-sub">
+                          Here's what's happening at Khadira Textile Mills today.
                         </p>
                       </div>
-                      <div className="erp-date-selector" title="Filter date range">
-                        <Activity size={14} style={{ color: '#2563eb' }} />
-                        <span>Last 30 days</span>
+
+                      {/* Date Range Dropdown with Calendar Icon */}
+                      <div className="erp-dropdown-wrap">
+                        <button
+                          type="button"
+                          className="erp-hero-date-btn"
+                          onClick={() => setIsDateRangeOpen(!isDateRangeOpen)}
+                        >
+                          <Calendar size={14} />
+                          <span>{dateRangeFilter}</span>
+                          <ChevronDown size={13} />
+                        </button>
+                        {isDateRangeOpen && (
+                          <div className="erp-dropdown-menu right-aligned">
+                            {['Today', 'This Week', 'This Month', 'This Quarter', 'This Year'].map((range) => (
+                              <button
+                                key={range}
+                                type="button"
+                                className={`erp-dropdown-item ${dateRangeFilter === range ? 'selected' : ''}`}
+                                onClick={() => {
+                                  setDateRangeFilter(range);
+                                  setIsDateRangeOpen(false);
+                                }}
+                              >
+                                {range}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    {/* 8-Card KPI Grid (4 col desktop, 2 col tablet, 1 col mobile) */}
-                    <div className="erp-kpi-grid">
-                      {/* Card 1: Revenue */}
-                      <div className="erp-kpi-card">
-                        <div className="erp-kpi-top">
-                          <span className="erp-kpi-label">Revenue</span>
-                          <div className="erp-kpi-icon-badge">
-                            <TrendingUp size={15} />
+                    {/* 2. 4 KPI CARDS (Overlapping bottom edge of hero banner) */}
+                    <div className="erp-kpi-row">
+                      {/* Card 1: Yarn in Stock */}
+                      <div className="erp-kpi-card-v2">
+                        <div className="erp-kpi-media-circle">
+                          <img 
+                            src="/assets/images/yarn-cones.jpg" 
+                            alt="Yarn in Stock" 
+                            onError={(e) => { e.target.src = '/images/factory/yarn-cones.jpg'; }} 
+                          />
+                        </div>
+                        <div className="erp-kpi-body">
+                          <span className="erp-kpi-title">Yarn in Stock</span>
+                          <div className="erp-kpi-number-wrap">
+                            <span className="erp-kpi-big-num">12.8</span>
+                            <span className="erp-kpi-unit">Tons</span>
+                          </div>
+                          <div className="erp-kpi-trend green">
+                            <span>↑ +5%</span>
                           </div>
                         </div>
-                        <div className="erp-kpi-value tabular-nums">₹ 48.5L</div>
-                        <div className="erp-kpi-footer text-success">
-                          ▲ 12.4% vs previous 30 days
+                        <div className="erp-kpi-sparkline">
+                          <svg width="68" height="28" viewBox="0 0 68 28" fill="none">
+                            <path d="M2 20 Q 18 16, 30 22 T 50 10 T 66 4" stroke="#10B981" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
                         </div>
                       </div>
 
-                      {/* Card 2: Gross profit */}
-                      <div className="erp-kpi-card">
-                        <div className="erp-kpi-top">
-                          <span className="erp-kpi-label">Gross profit</span>
-                          <div className="erp-kpi-icon-badge">
-                            <Coins size={15} />
+                      {/* Card 2: Fabric Production */}
+                      <div className="erp-kpi-card-v2">
+                        <div className="erp-kpi-media-circle">
+                          <img 
+                            src="/assets/images/finishing-fabric.jpg" 
+                            alt="Fabric Production" 
+                            onError={(e) => { e.target.src = '/images/factory/fabric-rolls.jpg'; }} 
+                          />
+                        </div>
+                        <div className="erp-kpi-body">
+                          <span className="erp-kpi-title">Fabric Production</span>
+                          <div className="erp-kpi-number-wrap">
+                            <span className="erp-kpi-big-num">8,240</span>
+                            <span className="erp-kpi-unit">Meters</span>
+                          </div>
+                          <div className="erp-kpi-trend green">
+                            <span>↑ +12%</span>
                           </div>
                         </div>
-                        <div className="erp-kpi-value tabular-nums">₹ 14.2L</div>
-                        <div className="erp-kpi-footer text-muted">
-                          29.3% margin on goods sold
+                        <div className="erp-kpi-sparkline">
+                          <svg width="68" height="28" viewBox="0 0 68 28" fill="none">
+                            <path d="M2 22 Q 18 24, 30 16 T 50 18 T 66 6" stroke="#2563EB" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
                         </div>
                       </div>
 
-                      {/* Card 3: Receivables */}
-                      <div className="erp-kpi-card">
-                        <div className="erp-kpi-top">
-                          <span className="erp-kpi-label">Receivables</span>
-                          <div className="erp-kpi-icon-badge">
-                            <Receipt size={15} />
+                      {/* Card 3: Active Orders */}
+                      <div className="erp-kpi-card-v2">
+                        <div className="erp-kpi-icon-circle warm-bg">
+                          <ClipboardList size={20} />
+                        </div>
+                        <div className="erp-kpi-body">
+                          <span className="erp-kpi-title">Active Orders</span>
+                          <div className="erp-kpi-number-wrap">
+                            <span className="erp-kpi-big-num">{liveOrders.length > 0 ? liveOrders.length : 24}</span>
+                          </div>
+                          <div className="erp-kpi-trend red">
+                            <span>▲ 6 at risk</span>
                           </div>
                         </div>
-                        <div className="erp-kpi-value tabular-nums">₹ 18.6L</div>
-                        <div className="erp-kpi-footer text-danger" onClick={() => setErpSidebarTab('sales-orders')}>
-                          ₹ 18.6L overdue on 4 invoice(s) →
+                        <div className="erp-kpi-sparkline">
+                          <svg width="68" height="28" viewBox="0 0 68 28" fill="none">
+                            <path d="M2 16 Q 16 10, 28 20 T 48 14 T 66 18" stroke="#F87171" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
                         </div>
                       </div>
 
-                      {/* Card 4: Payables */}
-                      <div className="erp-kpi-card">
-                        <div className="erp-kpi-top">
-                          <span className="erp-kpi-label">Payables</span>
-                          <div className="erp-kpi-icon-badge">
-                            <Wallet size={15} />
+                      {/* Card 4: QC Pass Rate */}
+                      <div className="erp-kpi-card-v2">
+                        <div className="erp-kpi-icon-circle green-bg">
+                          <ShieldCheck size={20} />
+                        </div>
+                        <div className="erp-kpi-body">
+                          <span className="erp-kpi-title">QC Pass Rate</span>
+                          <div className="erp-kpi-number-wrap">
+                            <span className="erp-kpi-big-num">92.4%</span>
+                          </div>
+                          <div className="erp-kpi-trend green">
+                            <span>↑ +2.1%</span>
                           </div>
                         </div>
-                        <div className="erp-kpi-value tabular-nums">₹ 12.4L</div>
-                        <div className="erp-kpi-footer text-danger">
-                          ₹ 12.4L overdue on 2 bill(s)
-                        </div>
-                      </div>
-
-                      {/* Card 5: Stock value */}
-                      <div className="erp-kpi-card">
-                        <div className="erp-kpi-top">
-                          <span className="erp-kpi-label">Stock value</span>
-                          <div className="erp-kpi-icon-badge">
-                            <Boxes size={15} />
-                          </div>
-                        </div>
-                        <div className="erp-kpi-value tabular-nums">₹ 34.8L</div>
-                        <div className="erp-kpi-footer text-muted">
-                          At moving average cost
-                        </div>
-                      </div>
-
-                      {/* Card 6: Orders to ship */}
-                      <div className="erp-kpi-card">
-                        <div className="erp-kpi-top">
-                          <span className="erp-kpi-label">Orders to ship</span>
-                          <div className="erp-kpi-icon-badge">
-                            <Package size={15} />
-                          </div>
-                        </div>
-                        <div className="erp-kpi-value tabular-nums">{liveOrders.length || 8}</div>
-                        <div className="erp-kpi-footer text-link" onClick={() => setErpSidebarTab('sales-orders')}>
-                          See open sales orders →
-                        </div>
-                      </div>
-
-                      {/* Card 7: Orders to receive */}
-                      <div className="erp-kpi-card">
-                        <div className="erp-kpi-top">
-                          <span className="erp-kpi-label">Orders to receive</span>
-                          <div className="erp-kpi-icon-badge">
-                            <Truck size={15} />
-                          </div>
-                        </div>
-                        <div className="erp-kpi-value tabular-nums">{livePOs.length || 4}</div>
-                        <div className="erp-kpi-footer text-link" onClick={() => setErpSidebarTab('purchases')}>
-                          See open purchase orders →
-                        </div>
-                      </div>
-
-                      {/* Card 8: Low stock */}
-                      <div className="erp-kpi-card">
-                        <div className="erp-kpi-top">
-                          <span className="erp-kpi-label">Low stock</span>
-                          <div className="erp-kpi-icon-badge">
-                            <AlertTriangle size={15} />
-                          </div>
-                        </div>
-                        <div className="erp-kpi-value tabular-nums">{liveDashboardMetrics?.low_stock_alerts?.length || 3}</div>
-                        <div className="erp-kpi-footer text-danger">
-                          Yarn counts at or under reorder point
+                        <div className="erp-kpi-sparkline">
+                          <svg width="68" height="28" viewBox="0 0 68 28" fill="none">
+                            <path d="M2 22 Q 16 22, 28 18 T 46 14 T 66 4" stroke="#10B981" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
                         </div>
                       </div>
                     </div>
 
-                    {/* 12-Col Row: Chart Card (8 cols) + Low Stock Card (4 cols) with SAME HEIGHT */}
-                    <div className="erp-grid-12">
-                      {/* Left: 12-Month Invoiced Sales & Gross Profit Chart */}
-                      <div className="erp-chart-card">
-                        <div className="erp-card-header">
-                          <div>
-                            <h3 className="erp-card-title">Sales and gross profit</h3>
-                            <p className="erp-card-subtitle">
-                              Invoiced sales (excl. tax) and profit after cost of goods, last 12 months
-                            </p>
+                    {/* 3. ROW: MILL FLOW (8 Cols) + MACHINE STATUS (4 Cols) */}
+                    <div className="erp-row-mill-machines">
+                      {/* Mill Flow Card */}
+                      <div className="erp-card erp-card-mill-flow">
+                        <div className="erp-card-header-bar">
+                          <div className="erp-card-heading-group">
+                            <div className="erp-title-with-icon">
+                              <Factory size={18} className="erp-card-icon-main" />
+                              <h2 className="erp-card-title-v2">Mill Flow</h2>
+                            </div>
+                            <p className="erp-card-subtitle-v2">From yarn to dispatch — real-time production status</p>
                           </div>
                           <button
                             type="button"
-                            className="erp-card-link"
-                            onClick={() => setErpSidebarTab('reports')}
+                            className="erp-card-action-btn"
+                            onClick={() => setErpSidebarTab('sales-orders')}
                           >
-                            <span>Reports</span>
+                            <span>View All Orders</span>
                             <ArrowRight size={13} />
                           </button>
                         </div>
 
-                        {/* Chart Body with Legend & Explicit Height Stage */}
-                        <div className="erp-chart-wrap">
-                          <div className="erp-chart-legend">
-                            <div className="erp-legend-item">
-                              <span className="erp-legend-dot sales" />
-                              <span>Invoiced sales (excl. tax)</span>
-                            </div>
-                            <div className="erp-legend-item">
-                              <span className="erp-legend-dot profit" />
-                              <span>Gross profit</span>
-                            </div>
-                          </div>
-
-                          <div className="erp-chart-stage">
-                            {/* Y Axis Labels */}
-                            <div className="erp-chart-y-axis">
-                              <span>₹ 60L</span>
-                              <span>₹ 45L</span>
-                              <span>₹ 30L</span>
-                              <span>₹ 15L</span>
-                              <span>0</span>
-                            </div>
-
-                            {/* Plot Area with 4 Horizontal Grid Lines & 12 Bar Columns */}
-                            <div className="erp-chart-plot-area">
-                              <div className="erp-grid-line gl-1" />
-                              <div className="erp-grid-line gl-2" />
-                              <div className="erp-grid-line gl-3" />
-                              <div className="erp-grid-line gl-4" />
-
-                              {[
-                                { m: 'Jan', sVal: '42.5', pVal: '12.8', sH: 70, pH: 42 },
-                                { m: 'Feb', sVal: '38.0', pVal: '11.2', sH: 63, pH: 37 },
-                                { m: 'Mar', sVal: '46.2', pVal: '14.5', sH: 77, pH: 48 },
-                                { m: 'Apr', sVal: '51.0', pVal: '15.8', sH: 85, pH: 52 },
-                                { m: 'May', sVal: '39.5', pVal: '11.9', sH: 65, pH: 39 },
-                                { m: 'Jun', sVal: '58.4', pVal: '17.6', sH: 97, pH: 58 },
-                                { m: 'Jul', sVal: '44.0', pVal: '13.2', sH: 73, pH: 44 },
-                                { m: 'Aug', sVal: '48.2', pVal: '14.9', sH: 80, pH: 49 },
-                                { m: 'Sep', sVal: '52.8', pVal: '16.1', sH: 88, pH: 53 },
-                                { m: 'Oct', sVal: '60.0', pVal: '18.2', sH: 100, pH: 60 },
-                                { m: 'Nov', sVal: '45.6', pVal: '13.8', sH: 76, pH: 46 },
-                                { m: 'Dec', sVal: '49.3', pVal: '15.1', sH: 82, pH: 50 },
-                              ].map((bar, idx) => (
-                                <div
-                                  key={idx}
-                                  className="erp-bar-group"
-                                  onMouseEnter={() => setChartHoverMonth(idx)}
-                                  onMouseLeave={() => setChartHoverMonth(null)}
-                                >
-                                  {chartHoverMonth === idx && (
-                                    <div className="erp-chart-tooltip">
-                                      <strong style={{ color: '#fff' }}>{bar.m} Performance</strong>
-                                      <span style={{ color: '#60a5fa' }}>Sales: ₹ {bar.sVal}L</span>
-                                      <span style={{ color: '#a5b4fc' }}>Profit: ₹ {bar.pVal}L</span>
-                                    </div>
-                                  )}
-                                  <div className="erp-bar-twin-wrap">
-                                    <div
-                                      className="erp-bar-pillar sales"
-                                      style={{ height: `${bar.sH}%` }}
-                                      title={`${bar.m} Invoiced: ₹ ${bar.sVal}L`}
-                                    />
-                                    <div
-                                      className="erp-bar-pillar profit"
-                                      style={{ height: `${bar.pH}%` }}
-                                      title={`${bar.m} Profit: ₹ ${bar.pVal}L`}
-                                    />
-                                  </div>
-                                  <span className="erp-bar-x-label">{bar.m}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Right: Low Stock Card with Textile Yarn Counts */}
-                      <div className="erp-lowstock-card">
-                        <div className="erp-card-header">
-                          <div>
-                            <h3 className="erp-card-title">Low stock</h3>
-                            <p className="erp-card-subtitle">
-                              Company-wide stock at or below the reorder point
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            className="erp-btn-secondary"
-                            style={{ height: '30px', padding: '0 10px', fontSize: '11.5px' }}
-                            onClick={() => {
-                              setCreateModalType('purchase');
-                              setIsCreateModalOpen(true);
-                            }}
-                          >
-                            Reorder
-                          </button>
-                        </div>
-
-                        <div className="erp-lowstock-list">
-                          {[
-                            { name: 'Cotton Yarn 20s Ring Spun', sku: 'YRN-20-W', reorder: '500 kg', left: '320 kg left', sev: 'critical' },
-                            { name: 'Poly-Cotton Yarn 65/35', sku: 'YRN-PC-65', reorder: '400 kg', left: '285 kg left', sev: 'warning' },
-                            { name: 'Cotton Yarn 30s Combed', sku: 'YRN-30-W', reorder: '300 kg', left: '210 kg left', sev: 'warning' },
-                            { name: 'Cotton Yarn 40s Dyed Red', sku: 'YRN-40-C', reorder: '200 kg', left: '140 kg left', sev: 'critical' },
-                          ].map((item, idx) => (
-                            <div key={idx} className="erp-lowstock-item">
-                              <div className="erp-lowstock-info">
-                                <span className="erp-lowstock-name">{item.name}</span>
-                                <span className="erp-lowstock-meta">{item.sku} · reorder at {item.reorder}</span>
+                        <div className="erp-mill-flow-track">
+                          {MILL_FLOW_STEPS.map((step, idx) => (
+                            <div key={step.step} className="erp-flow-step">
+                              <div className="erp-flow-thumb-wrap">
+                                <img src={step.image} alt={step.name} className="erp-flow-thumb" />
                               </div>
-                              <span className={`erp-lowstock-badge ${item.sev}`}>
-                                {item.left}
-                              </span>
+                              <div className="erp-flow-info">
+                                <div className="erp-flow-name-row">
+                                  <span className={`erp-flow-badge badge-${step.tint}`}>{step.step}</span>
+                                  <span className="erp-flow-name">{step.name}</span>
+                                </div>
+                                <span className="erp-flow-status">{step.status}</span>
+                              </div>
+                              <div className={`erp-flow-bottom-tint tint-${step.tint}`}>
+                                <strong>{step.qty}</strong>
+                              </div>
                             </div>
                           ))}
                         </div>
+                      </div>
 
-                        <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px solid #1a1a20' }}>
+                      {/* Machine Status Card */}
+                      <div className="erp-card erp-card-machine-status">
+                        <div className="erp-card-header-bar">
+                          <h2 className="erp-card-title-v2">Machine Status</h2>
                           <button
                             type="button"
-                            className="erp-card-link"
-                            onClick={() => setErpSidebarTab('stock-levels')}
+                            className="erp-card-link-simple"
+                            onClick={() => setErpSidebarTab('machines')}
                           >
-                            <span>View all yarn stock</span>
+                            <span>View All</span>
                             <ArrowRight size={13} />
                           </button>
+                        </div>
+
+                        <div className="erp-machine-list">
+                          {MACHINE_STATUS_LIST.map((mach) => (
+                            <div key={mach.id} className="erp-machine-item">
+                              <div className="erp-machine-thumb-box">
+                                <img src={mach.image} alt={mach.name} />
+                              </div>
+                              <div className="erp-machine-info">
+                                <span className="erp-machine-name">{mach.name}</span>
+                                <div className="erp-machine-status-line">
+                                  <span className={`erp-status-dot dot-${mach.statusType}`} />
+                                  <span className={`erp-status-text text-${mach.statusType}`}>{mach.status}</span>
+                                </div>
+                                <span className="erp-machine-util">{mach.util}</span>
+                              </div>
+                              <div className="erp-machine-sparkline">
+                                <svg width="60" height="24" viewBox="0 0 60 24" fill="none">
+                                  <path
+                                    d={mach.sparkline}
+                                    stroke={mach.statusType === 'green' ? '#10B981' : mach.statusType === 'orange' ? '#F59E0B' : '#EF4444'}
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                  />
+                                </svg>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 4. CHARTS ROW: PRODUCTION TREND (7 Cols) + YARN INVENTORY BY TYPE (5 Cols) */}
+                    <div className="erp-row-charts">
+                      {/* Left: Production Trend Area Chart */}
+                      <div className="erp-card erp-card-chart-area">
+                        <div className="erp-card-header-bar">
+                          <h2 className="erp-card-title-v2">Production Trend (Meters)</h2>
+                          <div className="erp-dropdown-wrap">
+                            <button
+                              type="button"
+                              className="erp-filter-pill-btn"
+                              onClick={() => setIsChartWeekOpen(!isChartWeekOpen)}
+                            >
+                              <span>{chartWeekFilter}</span>
+                              <ChevronDown size={13} />
+                            </button>
+                            {isChartWeekOpen && (
+                              <div className="erp-dropdown-menu right-aligned">
+                                {['This Week', 'Last Week', 'This Month'].map((opt) => (
+                                  <button
+                                    key={opt}
+                                    type="button"
+                                    className={`erp-dropdown-item ${chartWeekFilter === opt ? 'selected' : ''}`}
+                                    onClick={() => {
+                                      setChartWeekFilter(opt);
+                                      setIsChartWeekOpen(false);
+                                    }}
+                                  >
+                                    {opt}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Chart Legend on Top */}
+                        <div className="erp-chart-legend-top">
+                          <div className="erp-legend-badge">
+                            <span className="erp-legend-dot blue" />
+                            <span>Weaving</span>
+                          </div>
+                          <div className="erp-legend-badge">
+                            <span className="erp-legend-dot coral" />
+                            <span>Dyeing</span>
+                          </div>
+                          <div className="erp-legend-badge">
+                            <span className="erp-legend-dot orange" />
+                            <span>Finishing</span>
+                          </div>
+                        </div>
+
+                        {/* Smooth SVG Area Chart */}
+                        <div className="erp-svg-chart-container">
+                          <svg width="100%" height="220" viewBox="0 0 540 220" preserveAspectRatio="none" className="chart-svg-main">
+                            <defs>
+                              <linearGradient id="grad-weaving" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#2563EB" stopOpacity="0.32" />
+                                <stop offset="100%" stopColor="#2563EB" stopOpacity="0.02" />
+                              </linearGradient>
+                              <linearGradient id="grad-dyeing" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#F87171" stopOpacity="0.28" />
+                                <stop offset="100%" stopColor="#F87171" stopOpacity="0.02" />
+                              </linearGradient>
+                              <linearGradient id="grad-finishing" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#F59E0B" stopOpacity="0.25" />
+                                <stop offset="100%" stopColor="#F59E0B" stopOpacity="0.02" />
+                              </linearGradient>
+                            </defs>
+
+                            {/* Horizontal Gridlines */}
+                            <line x1="40" y1="30" x2="520" y2="30" stroke="#F0ECE4" strokeWidth="1" strokeDasharray="3 3" />
+                            <line x1="40" y1="70" x2="520" y2="70" stroke="#F0ECE4" strokeWidth="1" strokeDasharray="3 3" />
+                            <line x1="40" y1="110" x2="520" y2="110" stroke="#F0ECE4" strokeWidth="1" strokeDasharray="3 3" />
+                            <line x1="40" y1="150" x2="520" y2="150" stroke="#F0ECE4" strokeWidth="1" strokeDasharray="3 3" />
+                            <line x1="40" y1="190" x2="520" y2="190" stroke="#EAE5DC" strokeWidth="1" />
+
+                            {/* Y Axis Labels */}
+                            <text x="32" y="34" fontSize="10" fill="#94A3B8" textAnchor="end">10K</text>
+                            <text x="32" y="74" fontSize="10" fill="#94A3B8" textAnchor="end">7.5K</text>
+                            <text x="32" y="114" fontSize="10" fill="#94A3B8" textAnchor="end">5K</text>
+                            <text x="32" y="154" fontSize="10" fill="#94A3B8" textAnchor="end">2.5K</text>
+                            <text x="32" y="193" fontSize="10" fill="#94A3B8" textAnchor="end">0</text>
+
+                            {/* Series 1: Weaving Area & Line */}
+                            <path
+                              d="M 60 114 C 110 90, 160 100, 210 74 C 270 52, 330 46, 380 92 C 430 118, 480 98, 510 102 L 510 190 L 60 190 Z"
+                              fill="url(#grad-weaving)"
+                            />
+                            <path
+                              d="M 60 114 C 110 90, 160 100, 210 74 C 270 52, 330 46, 380 92 C 430 118, 480 98, 510 102"
+                              fill="none"
+                              stroke="#2563EB"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                            />
+
+                            {/* Series 2: Dyeing Area & Line */}
+                            <path
+                              d="M 60 148 C 110 132, 160 136, 210 120 C 270 106, 330 108, 380 132 C 430 144, 480 134, 510 136 L 510 190 L 60 190 Z"
+                              fill="url(#grad-dyeing)"
+                            />
+                            <path
+                              d="M 60 148 C 110 132, 160 136, 210 120 C 270 106, 330 108, 380 132 C 430 144, 480 134, 510 136"
+                              fill="none"
+                              stroke="#F87171"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                            />
+
+                            {/* Series 3: Finishing Area & Line */}
+                            <path
+                              d="M 60 166 C 110 156, 160 160, 210 148 C 270 138, 330 142, 380 156 C 430 162, 480 154, 510 156 L 510 190 L 60 190 Z"
+                              fill="url(#grad-finishing)"
+                            />
+                            <path
+                              d="M 60 166 C 110 156, 160 160, 210 148 C 270 138, 330 142, 380 156 C 430 162, 480 154, 510 156"
+                              fill="none"
+                              stroke="#F59E0B"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                            />
+
+                            {/* Data points on Weaving Line */}
+                            {[
+                              { cx: 60, cy: 114, day: '4 Oct', val: '4,800m' },
+                              { cx: 135, cy: 92, day: '5 Oct', val: '6,200m' },
+                              { cx: 210, cy: 74, day: '6 Oct', val: '7,100m' },
+                              { cx: 285, cy: 50, day: '7 Oct', val: '8,400m' },
+                              { cx: 360, cy: 82, day: '8 Oct', val: '6,900m' },
+                              { cx: 435, cy: 110, day: '9 Oct', val: '5,200m' },
+                              { cx: 510, cy: 102, day: '10 Oct', val: '7,420m' },
+                            ].map((pt, i) => (
+                              <g key={i}>
+                                <circle
+                                  cx={pt.cx}
+                                  cy={pt.cy}
+                                  r="4"
+                                  fill="#FFFFFF"
+                                  stroke="#2563EB"
+                                  strokeWidth="2"
+                                  style={{ cursor: 'pointer' }}
+                                  onMouseEnter={() => setHoveredTrendIndex(i)}
+                                  onMouseLeave={() => setHoveredTrendIndex(null)}
+                                />
+                                <text x={pt.cx} y="206" fontSize="10.5" fill="#64748B" textAnchor="middle">
+                                  {pt.day}
+                                </text>
+                              </g>
+                            ))}
+                          </svg>
+
+                          {hoveredTrendIndex !== null && (
+                            <div className="erp-chart-tooltip-v2">
+                              <strong>Day Performance</strong>
+                              <span>Weaving: ~7,420m</span>
+                              <span>Dyeing: ~4,200m</span>
+                              <span>Finishing: ~3,100m</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right: Yarn Inventory by Type Donut Chart */}
+                      <div className="erp-card erp-card-donut">
+                        <div className="erp-card-header-bar">
+                          <h2 className="erp-card-title-v2">Yarn Inventory by Type</h2>
+                          <div className="erp-dropdown-wrap">
+                            <button
+                              type="button"
+                              className="erp-filter-pill-btn"
+                              onClick={() => setIsYarnTypeOpen(!isYarnTypeOpen)}
+                            >
+                              <span>{yarnTypeFilter}</span>
+                              <ChevronDown size={13} />
+                            </button>
+                            {isYarnTypeOpen && (
+                              <div className="erp-dropdown-menu right-aligned">
+                                {['View All', 'Natural Fibers', 'Synthetics', 'Blended'].map((opt) => (
+                                  <button
+                                    key={opt}
+                                    type="button"
+                                    className={`erp-dropdown-item ${yarnTypeFilter === opt ? 'selected' : ''}`}
+                                    onClick={() => {
+                                      setYarnTypeFilter(opt);
+                                      setIsYarnTypeOpen(false);
+                                    }}
+                                  >
+                                    {opt}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="erp-donut-content-row">
+                          <div className="erp-donut-stage">
+                            <svg width="170" height="170" viewBox="0 0 170 170">
+                              <circle cx="85" cy="85" r="62" fill="none" stroke="#F4EFE6" strokeWidth="24" />
+                              {/* Segments: Cotton (42%), Polyester (22%), Viscose (15%), Acrylic (8%), Blended (10%), Others (3%) */}
+                              <circle
+                                cx="85"
+                                cy="85"
+                                r="62"
+                                fill="none"
+                                stroke="#2563EB"
+                                strokeWidth="24"
+                                strokeDasharray="163 226"
+                                strokeDashoffset="0"
+                                transform="rotate(-90 85 85)"
+                              />
+                              <circle
+                                cx="85"
+                                cy="85"
+                                r="62"
+                                fill="none"
+                                stroke="#F87171"
+                                strokeWidth="24"
+                                strokeDasharray="85 304"
+                                strokeDashoffset="-163"
+                                transform="rotate(-90 85 85)"
+                              />
+                              <circle
+                                cx="85"
+                                cy="85"
+                                r="62"
+                                fill="none"
+                                stroke="#F59E0B"
+                                strokeWidth="24"
+                                strokeDasharray="58 331"
+                                strokeDashoffset="-248"
+                                transform="rotate(-90 85 85)"
+                              />
+                              <circle
+                                cx="85"
+                                cy="85"
+                                r="62"
+                                fill="none"
+                                stroke="#60A5FA"
+                                strokeWidth="24"
+                                strokeDasharray="31 358"
+                                strokeDashoffset="-306"
+                                transform="rotate(-90 85 85)"
+                              />
+                              <circle
+                                cx="85"
+                                cy="85"
+                                r="62"
+                                fill="none"
+                                stroke="#4F46E5"
+                                strokeWidth="24"
+                                strokeDasharray="39 350"
+                                strokeDashoffset="-337"
+                                transform="rotate(-90 85 85)"
+                              />
+                              <circle
+                                cx="85"
+                                cy="85"
+                                r="62"
+                                fill="none"
+                                stroke="#94A3B8"
+                                strokeWidth="24"
+                                strokeDasharray="12 377"
+                                strokeDashoffset="-376"
+                                transform="rotate(-90 85 85)"
+                              />
+                            </svg>
+                            <div className="erp-donut-center-label">
+                              <span className="donut-center-big">12.8</span>
+                              <span className="donut-center-unit">Tons</span>
+                              <span className="donut-center-sub">Total</span>
+                            </div>
+                          </div>
+
+                          {/* Legend list on the right */}
+                          <div className="erp-donut-legend-list">
+                            {YARN_DONUT_DATA.map((item) => (
+                              <div key={item.label} className="erp-donut-legend-item">
+                                <div className="erp-donut-item-left">
+                                  <span className="erp-legend-dot" style={{ backgroundColor: item.color }} />
+                                  <span>{item.label}</span>
+                                </div>
+                                <span className="erp-donut-pct">{item.pct}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 5. BOTTOM ROW: ORDERS AT A GLANCE (8 Cols) + QUALITY CONTROL (4 Cols) */}
+                    <div className="erp-row-bottom">
+                      {/* Left: Orders at a Glance */}
+                      <div className="erp-card erp-card-orders-glance">
+                        <div className="erp-card-header-bar">
+                          <h2 className="erp-card-title-v2">Orders at a Glance</h2>
+                          <button
+                            type="button"
+                            className="erp-card-link-simple"
+                            onClick={() => setErpSidebarTab('sales-orders')}
+                          >
+                            <span>View All</span>
+                            <ArrowRight size={13} />
+                          </button>
+                        </div>
+
+                        <div className="erp-table-glance-wrap">
+                          <table className="erp-glance-table">
+                            <thead>
+                              <tr>
+                                <th>Order No.</th>
+                                <th>Fabric</th>
+                                <th>Quantity</th>
+                                <th>Progress</th>
+                                <th>Delivery</th>
+                                <th>Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {ORDERS_AT_A_GLANCE.map((ord) => (
+                                <tr key={ord.id}>
+                                  <td className="cell-bold">{ord.id}</td>
+                                  <td>{ord.fabric}</td>
+                                  <td className="tabular-nums">{ord.qty}</td>
+                                  <td>
+                                    <div className="erp-progress-cell">
+                                      <div className="erp-progress-track">
+                                        <div
+                                          className="erp-progress-fill"
+                                          style={{ width: `${ord.progress}%`, backgroundColor: ord.progressColor }}
+                                        />
+                                      </div>
+                                      <span className="erp-progress-pct tabular-nums">{ord.progress}%</span>
+                                    </div>
+                                  </td>
+                                  <td>{ord.delivery}</td>
+                                  <td>
+                                    <span className={`erp-badge-status badge-${ord.statusColor}`}>
+                                      {ord.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Right: Quality Control Widget */}
+                      <div className="erp-card erp-card-qc">
+                        <div className="erp-card-header-bar">
+                          <h2 className="erp-card-title-v2">Quality Control</h2>
+                          <button
+                            type="button"
+                            className="erp-card-link-simple"
+                            onClick={() => setErpSidebarTab('rolls-qc')}
+                          >
+                            <span>View All</span>
+                            <ArrowRight size={13} />
+                          </button>
+                        </div>
+
+                        <div className="erp-qc-body-row">
+                          <div className="erp-qc-image-wrap">
+                            <img 
+                              src="/assets/images/qc-fabric-roll.jpg" 
+                              alt="Fabric Roll Inspection" 
+                              className="erp-qc-image"
+                              onError={(e) => { e.target.src = '/images/factory/fabric-bolts.jpg'; }}
+                            />
+                          </div>
+                          <div className="erp-qc-stats-list">
+                            <div className="erp-qc-stat-row">
+                              <div className="erp-qc-stat-label">
+                                <span className="erp-stat-dot grey" />
+                                <span>Inspected Rolls</span>
+                              </div>
+                              <span className="erp-qc-stat-value tabular-nums">{QC_STATS.inspectedRolls}</span>
+                            </div>
+                            <div className="erp-qc-stat-row">
+                              <div className="erp-qc-stat-label">
+                                <span className="erp-stat-dot blue" />
+                                <span>Passed</span>
+                              </div>
+                              <div className="erp-qc-stat-value-group">
+                                <span className="erp-qc-stat-value tabular-nums">{QC_STATS.passed}</span>
+                                <span className="erp-qc-stat-pct green tabular-nums">({QC_STATS.passedPct})</span>
+                              </div>
+                            </div>
+                            <div className="erp-qc-stat-row">
+                              <div className="erp-qc-stat-label">
+                                <span className="erp-stat-dot orange" />
+                                <span>Rework</span>
+                              </div>
+                              <div className="erp-qc-stat-value-group">
+                                <span className="erp-qc-stat-value tabular-nums">{QC_STATS.rework}</span>
+                                <span className="erp-qc-stat-pct orange tabular-nums">({QC_STATS.reworkPct})</span>
+                              </div>
+                            </div>
+                            <div className="erp-qc-stat-row">
+                              <div className="erp-qc-stat-label">
+                                <span className="erp-stat-dot red" />
+                                <span>Rejected</span>
+                              </div>
+                              <div className="erp-qc-stat-value-group">
+                                <span className="erp-qc-stat-value tabular-nums">{QC_STATS.rejected}</span>
+                                <span className="erp-qc-stat-pct red tabular-nums">({QC_STATS.rejectedPct})</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </>
+
                 ) : (
                   /* ==========================================================
                      TABULAR MODULE PAGES (Responsive, Pixel-Aligned)
@@ -2036,7 +2562,7 @@ export default function App() {
                             <span className="erp-empty-desc">
                               {erpSidebarTab === 'reports'
                                 ? 'Looms Utilization: 91.4% · Weft Waste: 1.8% · Lab Pass Rate: 98.2% · On-Time Dispatch: 96.5%'
-                                : 'All records are synced directly with the Everest Textile Mills FastAPI database.'}
+                                : 'All records are synced directly with the Khadira Textile Mills FastAPI database.'}
                             </span>
                           </div>
                         )}
@@ -2593,7 +3119,7 @@ export default function App() {
           ========================================= */}
       <section className="studio-story-section" id="studio">
         <div className="studio-banner-wrap">
-          <img src={CRAFT_ASSETS.naturalDyedHanks} alt="Everest Textile Mills integrated production house" />
+          <img src={CRAFT_ASSETS.naturalDyedHanks} alt="Khadira Textile Mills integrated production house" />
           <div className="studio-banner-overlay">
             <span className="studio-watermark">KHADIRA</span>
           </div>
@@ -2605,7 +3131,7 @@ export default function App() {
           </h2>
           <div className="studio-prose">
             <p>
-              KHADIRA unites every department of Everest Textile Mills into a single, cohesive operating reality. From raw cotton intake in the storehouse to high-speed loom sheds, laboratory dye testing, and customs-sealed shipping containers, floor data flows in real time.
+              KHADIRA unites every department of Khadira Textile Mills into a single, cohesive operating reality. From raw cotton intake in the storehouse to high-speed loom sheds, laboratory dye testing, and customs-sealed shipping containers, floor data flows in real time.
             </p>
             <p>
               Eliminate clipboard delays, stock mismatches, and untracked machine downtime. Every fabric meter, shift operator, and yarn bale is timestamped, audited, and optimized.
@@ -2971,7 +3497,7 @@ export default function App() {
             <div>
               <h2 className="footer-brand-title">KHADIRA</h2>
               <p className="footer-manifesto">
-                <strong style={{ color: '#f7f5f0' }}>Everest Textile Mills</strong> — One unified operating system for raw material management, spinning & weaving telemetry, quality assurance, export dispatch, floor wages, and real-time production costing.
+                <strong style={{ color: '#f7f5f0' }}>Khadira Textile Mills</strong> — One unified operating system for raw material management, spinning & weaving telemetry, quality assurance, export dispatch, floor wages, and real-time production costing.
               </p>
 
               {!footerSubmitted ? (
@@ -3042,7 +3568,7 @@ export default function App() {
               <div>
                 <h4 className="footer-col-title">Factory HQ</h4>
                 <ul className="footer-col-links">
-                  <li><a href="mailto:operations@everesttextiles.com">operations@everesttextiles.com</a></li>
+                  <li><a href="mailto:operations@khadiratextiles.com">operations@khadiratextiles.com</a></li>
                   <li><a href="#contact">Mill Compound, Corridor 4</a></li>
                   <li><a href="#contact">+91 (0) 22 4920 1800</a></li>
                   <li><a href="#contact">Production Dispatch Desk</a></li>
@@ -3052,7 +3578,7 @@ export default function App() {
           </div>
 
           <div className="footer-bottom-row">
-            <span>© 2026 EVEREST TEXTILE MILLS. ALL RIGHTS RESERVED. OPERATING SYSTEM v4.2</span>
+            <span>© 2026 KHADIRA TEXTILE MILLS. ALL RIGHTS RESERVED. OPERATING SYSTEM v4.2</span>
             
             <div className="footer-legal-links">
               <a href="#privacy">Plant security policy</a>
