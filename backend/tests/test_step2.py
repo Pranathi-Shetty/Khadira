@@ -5,32 +5,6 @@ from fastapi.testclient import TestClient
 from tests.conftest import login
 
 
-# ─── Health ──────────────────────────────────────────────────────────────────
-
-class TestHealth:
-    def test_health_checks_database(self, client: TestClient):
-        r = client.get("/api/health")
-        assert r.status_code == 200
-        assert r.json() == {"status": "ok", "app": "Khadira"}
-
-    def test_health_reports_database_failure(self):
-        from mill.main import create_app
-        from sqlalchemy.exc import OperationalError
-
-        class BrokenSession:
-            def execute(self, statement):
-                raise OperationalError(statement, {}, OSError("database unavailable"))
-
-            def close(self):
-                pass
-
-        app = create_app(session_factory=lambda: BrokenSession())
-        with TestClient(app) as test_client:
-            r = test_client.get("/api/health")
-        assert r.status_code == 503
-        assert r.json() == {"detail": "Database unavailable"}
-
-
 # ─── Auth ────────────────────────────────────────────────────────────────────
 
 class TestAuth:

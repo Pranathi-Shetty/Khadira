@@ -13,8 +13,13 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./mill.db"
     secret_key: str = "dev-secret-change-me"
     session_hours: int = 8
-    cors_origins: list[str] = ["http://localhost:3000"]
     cookie_secure: bool = False
+    cors_origins: list[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
     serverless: bool = False
 
     @field_validator("cors_origins", mode="before")

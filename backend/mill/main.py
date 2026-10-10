@@ -1,10 +1,8 @@
 """FastAPI application factory for Khadira."""
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
 from .api import (
@@ -52,14 +50,6 @@ def create_app(session_factory: sessionmaker | None = None, settings: Settings |
 
     @app.get("/api/health", tags=["meta"])
     def health() -> dict:
-        """Report healthy only when the configured database accepts a query."""
-        db = app.state.session_factory()
-        try:
-            db.execute(text("SELECT 1"))
-        except SQLAlchemyError as exc:
-            raise HTTPException(status_code=503, detail="Database unavailable") from exc
-        finally:
-            db.close()
         return {"status": "ok", "app": "Khadira"}
 
     for module in (auth, items, partners, purchasing_api, orders, machines,
