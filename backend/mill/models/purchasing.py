@@ -3,7 +3,7 @@
 from datetime import date, datetime, timezone
 
 from sqlalchemy import (
-    BigInteger, Boolean, Date, DateTime, ForeignKey, Integer,
+    BigInteger, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer,
     Numeric, String, Text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -65,14 +65,21 @@ class YarnReceipt(Base):
 
 class YarnLot(Base):
     __tablename__ = "yarn_lot"
+    __table_args__ = (
+        CheckConstraint("remaining_g >= 0", name="ck_yarn_lot_remaining_non_negative"),
+        CheckConstraint("qty_g >= 0", name="ck_yarn_lot_qty_non_negative"),
+        CheckConstraint("remaining_g <= qty_g", name="ck_yarn_lot_remaining_lte_qty"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    receipt_id: Mapped[int] = mapped_column(ForeignKey("yarn_receipt.id"), nullable=False)
+    receipt_id: Mapped[int | None] = mapped_column(ForeignKey("yarn_receipt.id"))
     item_id: Mapped[int] = mapped_column(ForeignKey("item.id"), nullable=False)
     lot_number: Mapped[str] = mapped_column(String(60), nullable=False)
     qty_g: Mapped[int] = mapped_column(BigInteger, nullable=False)  # grams
+    remaining_g: Mapped[int] = mapped_column(BigInteger, nullable=False)  # grams
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
-    receipt: Mapped[YarnReceipt] = relationship()
+    receipt: Mapped[YarnReceipt | None] = relationship()
     item: Mapped[Item] = relationship()
+    run_materials: Mapped[list["RunMaterial"]] = relationship(back_populates="lot")

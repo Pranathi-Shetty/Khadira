@@ -521,6 +521,32 @@ export const MillAPI = {
       method: 'POST',
     });
   },
+
+  // --- Order Tracking ---
+  async getOrderTracking(orderId) {
+    return apiRequest(`/orders/${orderId}/tracking`);
+  },
+
+  // --- Financial Summary ---
+  async getFinancialSummary(year, month) {
+    return apiRequest(`/reports/financial-summary?year=${year}&month=${month}`);
+  },
+
+  // --- Receive Yarn ---
+  async receiveYarn(poId, data) {
+    return apiRequest(`/purchasing/${poId}/receive`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // --- Dispatch Rolls ---
+  async dispatchRolls(data) {
+    return apiRequest('/dispatch', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
 };
 
 export default MillAPI;

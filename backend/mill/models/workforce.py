@@ -34,8 +34,10 @@ class AttendanceEntry(Base):
     worker_id: Mapped[int] = mapped_column(ForeignKey("worker.id"), nullable=False)
     work_date: Mapped[date] = mapped_column(Date, nullable=False)
     shift: Mapped[str] = mapped_column(String(30), nullable=False)
-    hours_worked: Mapped[int | None] = mapped_column(Integer)  # minutes
+    # NOTE: Stored in MINUTES (1..1440, up to 24h). Named hours_worked in SQLite schema for compatibility.
+    hours_worked: Mapped[int | None] = mapped_column(Integer)
     pieces_produced: Mapped[int | None] = mapped_column(Integer)
+    is_present: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
     order_id: Mapped[int | None] = mapped_column(ForeignKey("sale_order.id"))
     run_id: Mapped[int | None] = mapped_column(ForeignKey("production_run.id"))
     notes: Mapped[str | None] = mapped_column(Text)
@@ -44,6 +46,15 @@ class AttendanceEntry(Base):
     approved_by_id: Mapped[int | None] = mapped_column(ForeignKey("user_account.id"))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    @property
+    def minutes_worked(self) -> int | None:
+        """Alias for hours_worked reflecting true unit (minutes)."""
+        return self.hours_worked
+
+    @minutes_worked.setter
+    def minutes_worked(self, val: int | None) -> None:
+        self.hours_worked = val
 
 
 class WageRun(Base):

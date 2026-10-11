@@ -1630,12 +1630,15 @@
   padding: 20px;
 }
 
-.erp-modal-card {
+.erp-modal-card,
+.erp-modal-window {
   background: #FFFFFF;
   border: 1px solid #EAE5DC;
   border-radius: 18px;
   width: 100%;
   max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
   box-shadow: 0 20px 40px rgba(11, 37, 69, 0.2);
   display: flex;
   flex-direction: column;
@@ -1685,7 +1688,9 @@
   color: #475569;
 }
 
-.erp-input {
+.erp-input,
+.erp-select,
+select.erp-input {
   background: #FAF8F5;
   border: 1px solid #E5E0D8;
   border-radius: 8px;
@@ -1693,9 +1698,18 @@
   font-size: 13.5px;
   color: #0F172A;
   outline: none;
+  font-family: inherit;
 }
 
-.erp-input:focus {
+select.erp-input,
+.erp-select {
+  cursor: pointer;
+  appearance: auto;
+}
+
+.erp-input:focus,
+.erp-select:focus,
+select.erp-input:focus {
   border-color: #2563EB;
   background: #FFFFFF;
 }

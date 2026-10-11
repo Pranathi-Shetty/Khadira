@@ -69,7 +69,7 @@ class Roll(Base):
     length_cm: Mapped[int] = mapped_column(Integer, nullable=False)  # centimetres for precision
     weight_g: Mapped[int | None] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(20), default="awaiting_qc")
-    # awaiting_qc | passed | failed | held | in_store | dispatched
+    # awaiting_qc | passed | rework | rejected | in_store | dispatched
     qc_grade: Mapped[str | None] = mapped_column(String(10))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
@@ -102,6 +102,7 @@ class RunMaterial(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     run: Mapped["ProductionRun"] = relationship(back_populates="materials")
+    lot: Mapped["YarnLot"] = relationship(back_populates="run_materials")
 
 
 class RunReconciliation(Base):

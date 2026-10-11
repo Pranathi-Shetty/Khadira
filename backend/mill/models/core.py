@@ -4,7 +4,7 @@ import secrets
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    BigInteger, Boolean, DateTime, ForeignKey, Integer, Numeric,
+    BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, Integer, Numeric,
     String, Text, UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -84,9 +84,27 @@ class Location(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
 
 
+VALID_MOVEMENT_TYPES = ("receipt", "yarn_issue", "yarn_return", "fabric_in", "fabric_out", "opening_balance", "adjustment", "legacy")
+
+
+# ==============================================================================
+# KNOWN ARCHITECTURAL NOTE ON STOCK QUANTITY UNITS:
+# The columns `StockLevel.qty_g` and `StockMove.delta_g` store integer quantities in
+# the item's canonical precision unit:
+#   - For Yarn / Raw Materials (Item.unit == 'kg'): unit is GRAMS (1 kg = 1,000 g).
+#   - For Fabric / Rolls (Item.unit == 'meters'): unit is CENTIMETRES (1 m = 100 cm).
+# This column was historically named `qty_g` / `delta_g`. Renaming it across all legacy
+# tables and migrations is high risk, so it is preserved as `qty_g` in the database schema.
+# API endpoints expose `qty_cm` / `quantity_m` for fabric and `qty_g` / `qty_kg` for yarn.
+# ==============================================================================
+
+
 class StockLevel(Base):
     __tablename__ = "stock_level"
-    __table_args__ = (UniqueConstraint("item_id", "location_id"),)
+    __table_args__ = (
+        UniqueConstraint("item_id", "location_id"),
+        CheckConstraint("qty_g >= 0", name="ck_stock_level_qty_non_negative"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     item_id: Mapped[int] = mapped_column(ForeignKey("item.id"), nullable=False)
@@ -99,17 +117,36 @@ class StockLevel(Base):
 
 class StockMove(Base):
     __tablename__ = "stock_move"
+    __table_args__ = (
+        CheckConstraint(
+            "movement_type IN ('receipt', 'yarn_issue', 'yarn_return', 'fabric_in', 'fabric_out', 'opening_balance', 'adjustment', 'legacy')",
+            name="ck_stock_move_movement_type",
+        ),
+        CheckConstraint(
+            "((movement_type = 'receipt' AND delta_g > 0) OR "
+            "(movement_type = 'fabric_in' AND delta_g > 0) OR "
+            "(movement_type = 'yarn_return' AND delta_g > 0) OR "
+            "(movement_type = 'opening_balance' AND delta_g > 0) OR "
+            "(movement_type = 'yarn_issue' AND delta_g < 0) OR "
+            "(movement_type = 'fabric_out' AND delta_g < 0) OR "
+            "(movement_type IN ('adjustment', 'legacy') AND delta_g != 0))",
+            name="ck_stock_move_type_direction",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     item_id: Mapped[int] = mapped_column(ForeignKey("item.id"), nullable=False)
     location_id: Mapped[int] = mapped_column(ForeignKey("location.id"), nullable=False)
     delta_g: Mapped[int] = mapped_column(BigInteger, nullable=False)  # positive=in, negative=out
+    movement_type: Mapped[str] = mapped_column(String(30), nullable=False, default="legacy")
+    user_id: Mapped[int] = mapped_column(ForeignKey("user_account.id", name="fk_stock_move_user_id"), nullable=False)
     ref: Mapped[str | None] = mapped_column(String(100))
     note: Mapped[str | None] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     item: Mapped[Item] = relationship()
     location: Mapped[Location] = relationship()
+    user: Mapped["User | None"] = relationship()
 
 
 class AuditLog(Base):

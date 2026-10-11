@@ -26,7 +26,9 @@ class AttendanceIn(BaseModel):
     worker_id: int
     work_date: date
     shift: str = Field(min_length=1, max_length=30)
-    hours_worked: int | None = Field(default=None, gt=0, le=1440)  # minutes
+    is_present: bool = True
+    minutes_worked: int | None = Field(default=None, gt=0, le=1440, description="Optional override duration in minutes (1 to 1440)")
+    hours_worked: int | None = Field(default=None, gt=0, le=1440, description="Optional override alias for minutes")
     pieces_produced: int | None = Field(default=None, ge=0)
     order_id: int | None = None
     run_id: int | None = None
@@ -41,9 +43,14 @@ def _worker_out(w: Worker) -> dict:
 
 def _entry_out(e: AttendanceEntry, worker: Worker | None = None) -> dict:
     return {"id": e.id, "worker_id": e.worker_id,
+            "worker_code": worker.code if worker else None,
             "worker_name": worker.full_name if worker else None,
             "work_date": e.work_date.isoformat(), "shift": e.shift,
-            "hours_worked": e.hours_worked, "pieces_produced": e.pieces_produced,
+            "is_present": getattr(e, "is_present", True),
+            "minutes_worked": e.hours_worked,
+            "hours_worked": e.hours_worked,
+            "hours": round(e.hours_worked / 60, 2) if e.hours_worked else 0.0,
+            "pieces_produced": e.pieces_produced,
             "order_id": e.order_id, "run_id": e.run_id, "notes": e.notes,
             "status": e.status, "created_by_id": e.created_by_id,
             "approved_by_id": e.approved_by_id,
@@ -94,10 +101,20 @@ def record_attendance(body: AttendanceIn, db: Db, user: can("attendance.write"))
     worker = db.get(Worker, body.worker_id)
     if worker is None or not worker.is_active:
         raise DomainError("Active worker not found.", 404)
-    if worker.wage_basis == "hourly" and not body.hours_worked:
-        raise DomainError("hours_worked is required for hourly workers.")
-    if worker.wage_basis == "piece_rate" and body.pieces_produced is None:
-        raise DomainError("pieces_produced is required for piece-rate workers.")
+    if body.is_present:
+        if worker.wage_basis == "hourly":
+            # If minutes/hours omitted on the floor, default to standard full mill shift (8 hrs = 480 mins)
+            custom_min = body.minutes_worked if body.minutes_worked is not None else body.hours_worked
+            effective_minutes = custom_min if custom_min is not None else 480
+            effective_pieces = None
+        else:
+            effective_minutes = None
+            effective_pieces = body.pieces_produced if body.pieces_produced is not None else 0
+    else:
+        # Worker marked absent
+        effective_minutes = 0 if worker.wage_basis == "hourly" else None
+        effective_pieces = 0 if worker.wage_basis == "piece_rate" else None
+
     duplicate = db.scalar(select(AttendanceEntry).where(
         AttendanceEntry.worker_id == body.worker_id,
         AttendanceEntry.work_date == body.work_date,
@@ -105,7 +122,11 @@ def record_attendance(body: AttendanceIn, db: Db, user: can("attendance.write"))
         AttendanceEntry.status != "voided"))
     if duplicate:
         raise DomainError("Attendance already exists for this worker, date, and shift.", 409)
-    entry = AttendanceEntry(**body.model_dump(), created_by_id=user.id, status="draft")
+    entry_dict = body.model_dump(exclude={"minutes_worked"})
+    entry_dict["hours_worked"] = effective_minutes
+    entry_dict["pieces_produced"] = effective_pieces
+    entry_dict["is_present"] = body.is_present
+    entry = AttendanceEntry(**entry_dict, created_by_id=user.id, status="draft")
     db.add(entry)
     db.flush()
     audit(db, entity="AttendanceEntry", entity_id=entry.id, action="record", user_id=user.id)

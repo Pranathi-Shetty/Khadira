@@ -2,6 +2,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from ..models import Item
 from ..services import inventory as inv_svc
 from .deps import CurrentUser, Db, can
 
@@ -26,8 +27,23 @@ def low_stock_alerts(db: Db, _: can["items.read"]) -> list:
 
 @router.get("/stock/{item_id}/{location_id}")
 def get_stock(item_id: int, location_id: int, db: Db, _: can["items.read"]) -> dict:
-    qty_g = inv_svc.stock_for(db, item_id, location_id)
-    return {"item_id": item_id, "location_id": location_id, "qty_g": qty_g, "qty_kg": round(qty_g / 1000, 3)}
+    qty_raw = inv_svc.stock_for(db, item_id, location_id)
+    item = db.get(Item, item_id)
+    is_fabric = (item and item.item_type != "yarn")
+    res = {
+        "item_id": item_id,
+        "location_id": location_id,
+        "qty_g": qty_raw,  # Underlying DB column: stores grams for yarn, cm for fabric
+        "qty_raw": qty_raw,
+    }
+    if is_fabric:
+        res["unit"] = "meters"
+        res["qty_cm"] = qty_raw
+        res["quantity_m"] = round(qty_raw / 100, 2)
+    else:
+        res["unit"] = "kg"
+        res["qty_kg"] = round(qty_raw / 1000, 3)
+    return res
 
 
 @router.post("/counts", status_code=201)

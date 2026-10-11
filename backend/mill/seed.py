@@ -151,12 +151,22 @@ def seed():
 
         # Seed some yarn stock in RAW
         from .models.core import StockLevel
+        from .models.purchasing import YarnLot
         raw_loc = locs["RAW"]
         for yarn_item in yarn_items:
             sl = db.query(StockLevel).filter_by(item_id=yarn_item.id, location_id=raw_loc.id).first()
             if sl is None:
                 sl = StockLevel(item_id=yarn_item.id, location_id=raw_loc.id, qty_g=2_000_000)  # 2000 kg each
                 db.add(sl)
+            lot = db.query(YarnLot).filter_by(lot_number=f"LOT-OPENING-{yarn_item.sku}").first()
+            if lot is None:
+                db.add(YarnLot(
+                    receipt_id=None,
+                    item_id=yarn_item.id,
+                    lot_number=f"LOT-OPENING-{yarn_item.sku}",
+                    qty_g=sl.qty_g,
+                    remaining_g=sl.qty_g,
+                ))
 
         # Seed orders
         from .models.orders import Order, OrderLine

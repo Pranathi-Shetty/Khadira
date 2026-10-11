@@ -3,7 +3,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..models import ITEM_YARN, Item, Location, StockLevel, StockMove
+from ..models import ITEM_YARN, Item, Location, StockLevel, StockMove, VALID_MOVEMENT_TYPES
 from .common import DomainError
 
 
@@ -31,8 +31,23 @@ def post_move(
     delta_g: int,
     ref: str | None = None,
     note: str | None = None,
+    movement_type: str = "adjustment",
+    user_id: int | None = None,
 ) -> StockMove:
     """Post a stock movement. Resolves item/location by id or by sku/code."""
+    if user_id is None:
+        raise DomainError("user_id is required for recording stock movements.")
+
+    if movement_type not in VALID_MOVEMENT_TYPES:
+        raise DomainError(f"Invalid movement_type '{movement_type}'. Must be one of {sorted(VALID_MOVEMENT_TYPES)}.")
+
+    if movement_type in ("receipt", "fabric_in", "yarn_return", "opening_balance") and delta_g <= 0:
+        raise DomainError(f"Stock movement type '{movement_type}' must add stock (delta_g > 0), got {delta_g}.")
+    if movement_type in ("yarn_issue", "fabric_out") and delta_g >= 0:
+        raise DomainError(f"Stock movement type '{movement_type}' must remove stock (delta_g < 0), got {delta_g}.")
+    if delta_g == 0:
+        raise DomainError("Stock movement delta_g cannot be zero.")
+
     if item_id is None:
         if item_sku is None:
             raise ValueError("Provide item_id or item_sku")
@@ -55,7 +70,15 @@ def post_move(
         raise DomainError("Stock would go negative.")
     level.qty_g = new_qty
 
-    move = StockMove(item_id=item_id, location_id=location_id, delta_g=delta_g, ref=ref, note=note)
+    move = StockMove(
+        item_id=item_id,
+        location_id=location_id,
+        delta_g=delta_g,
+        ref=ref,
+        note=note,
+        movement_type=movement_type,
+        user_id=user_id,
+    )
     db.add(move)
     
     # Check for low stock alert
@@ -161,7 +184,9 @@ def approve_stock_count(db: Session, session_id: int, user_id: int | None):
                 location_id=session.location_id,
                 delta_g=line.variance_g,
                 ref=f"STOCKCOUNT-{session.id}",
-                note=line.reason or "Stock count variance"
+                note=line.reason or "Stock count variance",
+                movement_type="adjustment",
+                user_id=user_id,
             )
             
     audit(db, entity="StockCountSession", entity_id=session.id, action="approve", user_id=user_id)

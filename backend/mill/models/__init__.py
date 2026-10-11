@@ -3,13 +3,14 @@
 from .base import Base
 from .core import (
     AuditLog, Item, Location, Notification, Session, StockCountLine, StockCountSession, StockLevel, StockMove, User, UserRole,
-    ITEM_YARN, ITEM_FABRIC,
+    ITEM_YARN, ITEM_FABRIC, VALID_MOVEMENT_TYPES,
 )
 from .partners import Buyer, Supplier
 from .purchasing import PurchaseOrder, PurchaseOrderLine, YarnLot, YarnReceipt
 from .orders import Order, OrderLine
 from .production import Machine, MachineDowntime, ProductionRun, Roll, RollDefect, RollEvent, RunMaterial, RunReconciliation
 from .finance import Invoice, InvoiceLine, Payment
+from .dispatch import Dispatch, DispatchRoll
 from .settings import Setting
 from .workforce import Worker, AttendanceEntry, WageRun, WageRunLine
 from .costing import OrderCost
@@ -17,11 +18,12 @@ from .costing import OrderCost
 __all__ = [
     "Base",
     "AuditLog", "Item", "Location", "Notification", "Session", "StockCountLine", "StockCountSession", "StockLevel", "StockMove", "User", "UserRole",
-    "ITEM_YARN", "ITEM_FABRIC",
+    "ITEM_YARN", "ITEM_FABRIC", "VALID_MOVEMENT_TYPES",
     "Buyer", "Supplier",
     "PurchaseOrder", "PurchaseOrderLine", "YarnLot", "YarnReceipt",
     "Order", "OrderLine",
     "Machine", "MachineDowntime", "ProductionRun", "Roll", "RollDefect", "RollEvent", "RunMaterial", "RunReconciliation",
+    "Dispatch", "DispatchRoll",
     "Invoice", "InvoiceLine", "Payment",
     "Setting",
     "Worker", "AttendanceEntry", "WageRun", "WageRunLine",

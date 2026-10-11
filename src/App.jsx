@@ -517,6 +517,42 @@ export default function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createModalType, setCreateModalType] = useState('order');
 
+  // Operational screens — live data
+  const [liveAttendance, setLiveAttendance] = useState([]);
+  const [liveWorkers, setLiveWorkers] = useState([]);
+  const [liveWageRuns, setLiveWageRuns] = useState([]);
+  const [liveFinancialSummary, setLiveFinancialSummary] = useState(null);
+  const [finSummaryLoading, setFinSummaryLoading] = useState(false);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  // Receive Yarn modal state
+  const [receiveModalOpen, setReceiveModalOpen] = useState(false);
+  const [receivePOId, setReceivePOId] = useState('');
+  const [receiveLotNo, setReceiveLotNo] = useState('');
+  const [receiveQtyKg, setReceiveQtyKg] = useState('');
+  // Inspect Roll modal state
+  const [inspectModalOpen, setInspectModalOpen] = useState(false);
+  const [inspectRollId, setInspectRollId] = useState('');
+  const [inspectVerdict, setInspectVerdict] = useState('pass');
+  const [inspectGrade, setInspectGrade] = useState('A');
+  const [inspectNote, setInspectNote] = useState('');
+  // Dispatch modal state
+  const [dispatchModalOpen, setDispatchModalOpen] = useState(false);
+  const [dispatchRollIds, setDispatchRollIds] = useState('');
+  const [dispatchBuyerId, setDispatchBuyerId] = useState('');
+  const [dispatchOrderId, setDispatchOrderId] = useState('');
+  const [dispatchVehicle, setDispatchVehicle] = useState('');
+  // Order tracking
+  const [trackOrderId, setTrackOrderId] = useState('');
+  const [trackResult, setTrackResult] = useState(null);
+  // Attendance record
+  const [attWorkerUid, setAttWorkerUid] = useState('');
+  const [attDate, setAttDate] = useState(new Date().toISOString().split('T')[0]);
+  const [attShift, setAttShift] = useState('Day (06:00-14:00)');
+  const [attPresent, setAttPresent] = useState(true);
+  // Financial summary month picker
+  const [finYear, setFinYear] = useState(new Date().getFullYear());
+  const [finMonth, setFinMonth] = useState(new Date().getMonth() + 1);
+
   // Modern ERP Sidebar & View State (like erp-otw7.vercel.app)
   const [erpSidebarTab, setErpSidebarTab] = useState('dashboard');
   // Interactive UI states for Khadira theme matching reference
@@ -566,6 +602,22 @@ export default function App() {
   const [newOrderBuyerName, setNewOrderBuyerName] = useState('Textile Exports Corp');
   const [newOrderMeters, setNewOrderMeters] = useState('1200');
   const [newOrderRate, setNewOrderRate] = useState('85');
+  const [newOrderItemId, setNewOrderItemId] = useState('');
+  const [newOrderBuyerId, setNewOrderBuyerId] = useState('');
+  const [newOrderDeliveryDate, setNewOrderDeliveryDate] = useState('');
+  const [newOrderNotes, setNewOrderNotes] = useState('');
+
+  // PO & Entity creation modal state
+  const [newPOItemId, setNewPOItemId] = useState('');
+  const [newPOSupplierId, setNewPOSupplierId] = useState('');
+  const [newEntityContact, setNewEntityContact] = useState('');
+  const [newEntityPhone, setNewEntityPhone] = useState('');
+  const [newEntityEmail, setNewEntityEmail] = useState('');
+  const [newItemSku, setNewItemSku] = useState('');
+  const [newItemType, setNewItemType] = useState('fabric');
+  const [newItemUnit, setNewItemUnit] = useState('m');
+  const [newMachineCode, setNewMachineCode] = useState('');
+  const [newMachineType, setNewMachineType] = useState('weaving');
 
   // Live FastAPI Backend Connectivity & Data Stores
   const [isBackendOnline, setIsBackendOnline] = useState(false);
@@ -579,6 +631,16 @@ export default function App() {
   const [liveRuns, setLiveRuns] = useState([]);
   const [liveDashboardMetrics, setLiveDashboardMetrics] = useState(null);
   const [liveInvoices, setLiveInvoices] = useState([]);
+
+  // Filtered fabric and yarn collections for orders and procurement
+  const fabricItems = useMemo(
+    () => liveItems.filter((i) => (i.item_type || '').toLowerCase() === 'fabric'),
+    [liveItems]
+  );
+  const yarnItems = useMemo(
+    () => liveItems.filter((i) => (i.item_type || '').toLowerCase() === 'yarn'),
+    [liveItems]
+  );
 
   const ROLE_CONFIG = {
     'Store Manager': {
@@ -624,7 +686,7 @@ export default function App() {
   const fetchAllLiveData = async () => {
     setIsFetchingData(true);
     try {
-      const [dashRes, itemsRes, machinesRes, ordersRes, rollsRes, runsRes, invRes, poRes, supRes, buyRes, qcRes] = await Promise.allSettled([
+      const [dashRes, itemsRes, machinesRes, ordersRes, rollsRes, runsRes, invRes, poRes, supRes, buyRes, qcRes, attRes, workersRes, wageRes] = await Promise.allSettled([
         MillAPI.getDashboard(),
         MillAPI.getItems(null, '', { all: true }),
         MillAPI.getMachines(),
@@ -636,6 +698,9 @@ export default function App() {
         MillAPI.getSuppliers(),
         MillAPI.getBuyers(),
         MillAPI.getPendingQC(),
+        MillAPI.getAttendance(),
+        MillAPI.getWorkers(),
+        MillAPI.getWageRuns(),
       ]);
 
       if (dashRes.status === 'fulfilled') setLiveDashboardMetrics(dashRes.value);
@@ -649,10 +714,35 @@ export default function App() {
       if (supRes.status === 'fulfilled' && supRes.value?.items) setLiveSuppliers(supRes.value.items);
       if (buyRes.status === 'fulfilled' && buyRes.value?.items) setLiveBuyers(buyRes.value.items);
       if (qcRes.status === 'fulfilled' && Array.isArray(qcRes.value)) setLivePendingQC(qcRes.value);
+      if (attRes.status === 'fulfilled') {
+        const attData = attRes.value;
+        setLiveAttendance(Array.isArray(attData) ? attData : (attData?.items || []));
+      }
+      if (workersRes.status === 'fulfilled') {
+        const wkData = workersRes.value;
+        setLiveWorkers(Array.isArray(wkData) ? wkData : (wkData?.items || []));
+      }
+      if (wageRes.status === 'fulfilled') {
+        const wgData = wageRes.value;
+        setLiveWageRuns(Array.isArray(wgData) ? wgData : (wgData?.items || []));
+      }
     } catch (err) {
       console.error('Error fetching live backend data:', err);
     } finally {
       setIsFetchingData(false);
+    }
+  };
+
+  const fetchFinancialSummary = async (y, m) => {
+    setFinSummaryLoading(true);
+    try {
+      const data = await MillAPI.getFinancialSummary(y, m);
+      setLiveFinancialSummary(data);
+    } catch (err) {
+      console.error('Financial summary error:', err);
+      setLiveFinancialSummary(null);
+    } finally {
+      setFinSummaryLoading(false);
     }
   };
 
@@ -1232,7 +1322,9 @@ export default function App() {
       return;
     }
     const meters = parseFloat(newOrderMeters) || 1200;
-    const ratePaise = (parseFloat(newOrderRate) || 85) * 100;
+    const ratePaise = Math.round((parseFloat(newOrderRate) || 85) * 100);
+    const fabricId = Number(newOrderItemId) || fabricItems[0]?.id || 7;
+    const buyerId = Number(newOrderBuyerId) || liveBuyers[0]?.id || 1;
 
     try {
       const res = await fetch('/api/orders', {
@@ -1240,13 +1332,13 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          buyer_id: 1,
+          buyer_id: buyerId,
           order_date: new Date().toISOString().split('T')[0],
-          delivery_date: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-          notes: `Created from modern ERP console for ${newOrderBuyerName}`,
+          delivery_date: newOrderDeliveryDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+          notes: newOrderNotes || `Created from modern ERP console for ${newOrderBuyerName}`,
           lines: [
             {
-              item_id: liveItems[0]?.id || 1,
+              item_id: fabricId,
               qty_meters: meters,
               rate_per_meter_paise: ratePaise
             }
@@ -1257,12 +1349,13 @@ export default function App() {
       if (res.ok) {
         setToastMessage(`✓ New Sales Order created in backend for ${newOrderBuyerName}!`);
       } else {
-        setToastMessage(`✓ Sales Order logged for ${newOrderBuyerName} (${meters}m @ ₹${newOrderRate}/m)`);
+        const data = await res.json().catch(() => null);
+        setToastMessage(`Failed: ${data?.detail || 'Order creation failed'}`);
       }
       setIsNewOrderModalOpen(false);
       await fetchAllLiveData();
-    } catch {
-      setToastMessage(`✓ Sales Order logged for ${newOrderBuyerName} (${meters}m @ ₹${newOrderRate}/m)`);
+    } catch (err) {
+      setToastMessage(`Failed: ${err.message}`);
       setIsNewOrderModalOpen(false);
     }
   };
@@ -1371,14 +1464,14 @@ export default function App() {
                 <span>Quality Control</span>
               </button>
 
-              {/* 6. Inventory */}
+              {/* 6. Order Tracking */}
               <button
                 type="button"
                 className={`erp-nav-item ${erpSidebarTab === 'stock-levels' ? 'active' : ''}`}
-                onClick={() => { setErpSidebarTab('stock-levels'); setIsMobileNavOpen(false); }}
+                onClick={() => { setErpSidebarTab('stock-levels'); setIsMobileNavOpen(false); setTrackResult(null); }}
               >
-                <Boxes size={18} />
-                <span>Inventory</span>
+                <ClipboardList size={18} />
+                <span>Order Tracking</span>
               </button>
 
               {/* 7. Orders */}
@@ -1401,7 +1494,7 @@ export default function App() {
                 <span>Dispatch</span>
               </button>
 
-              {/* 9. Workforce */}
+              {/* 9. Workforce & Attendance */}
               <button
                 type="button"
                 className={`erp-nav-item ${erpSidebarTab === 'customers' ? 'active' : ''}`}
@@ -1421,14 +1514,14 @@ export default function App() {
                 <span>Finance</span>
               </button>
 
-              {/* 11. Reports */}
+              {/* 11. Financial Summary */}
               <button
                 type="button"
                 className={`erp-nav-item ${erpSidebarTab === 'reports' ? 'active' : ''}`}
                 onClick={() => { setErpSidebarTab('reports'); setIsMobileNavOpen(false); }}
               >
                 <BarChart3 size={18} />
-                <span>Reports</span>
+                <span>Fin. Summary</span>
               </button>
             </nav>
 
@@ -2298,13 +2391,29 @@ export default function App() {
                           type="button"
                           className="erp-btn-primary"
                           onClick={() => {
-                            setCreateModalType(
+                            const modalType =
                               erpSidebarTab === 'purchases' ? 'purchase' :
                               erpSidebarTab === 'customers' ? 'customer' :
                               erpSidebarTab === 'suppliers' ? 'supplier' :
                               erpSidebarTab === 'inventory' ? 'item' :
-                              erpSidebarTab === 'machines' ? 'machine' : 'order'
-                            );
+                              erpSidebarTab === 'machines' ? 'machine' : 'order';
+                            setCreateModalType(modalType);
+                            if (modalType === 'order') {
+                              if (!newOrderItemId && fabricItems.length > 0) {
+                                setNewOrderItemId(String(fabricItems[0].id));
+                              }
+                              if (!newOrderBuyerId && liveBuyers.length > 0) {
+                                setNewOrderBuyerId(String(liveBuyers[0].id));
+                                setNewOrderBuyerName(liveBuyers[0].name);
+                              }
+                            } else if (modalType === 'purchase') {
+                              if (!newPOItemId && yarnItems.length > 0) {
+                                setNewPOItemId(String(yarnItems[0].id));
+                              }
+                              if (!newPOSupplierId && liveSuppliers.length > 0) {
+                                setNewPOSupplierId(String(liveSuppliers[0].id));
+                              }
+                            }
                             setIsCreateModalOpen(true);
                           }}
                         >
@@ -2421,45 +2530,28 @@ export default function App() {
                                           {po.status || 'draft'}
                                         </span>
                                       </td>
-                                      <td>
-                                        <button
-                                          type="button"
-                                          className="erp-btn-secondary"
-                                          style={{ height: '28px', padding: '0 8px', fontSize: '11px' }}
-                                          onClick={() => setToastMessage(`Gate pass printed for ${po.ref}`)}
-                                        >
-                                          Gate Pass
-                                        </button>
+                                      <td style={{ display: 'flex', gap: '6px' }}>
+                                        {po.status === 'confirmed' ? (
+                                          <button type="button" className="erp-btn-primary" style={{ height: '28px', padding: '0 8px', fontSize: '11px' }} onClick={() => { setReceivePOId(String(po.id)); setReceiveModalOpen(true); }}>Receive Yarn</button>
+                                        ) : po.status === 'draft' ? (
+                                          <button type="button" className="erp-btn-secondary" style={{ height: '28px', padding: '0 8px', fontSize: '11px' }} onClick={async () => { try { await MillAPI.confirmPO(po.id); setToastMessage(`PO ${po.ref} confirmed`); fetchAllLiveData(); } catch(err) { setToastMessage(err.message); } }}>Confirm</button>
+                                        ) : (
+                                          <span style={{ fontSize: '12px', color: '#94a3b8' }}>Received</span>
+                                        )}
                                       </td>
                                     </tr>
                                   );
                                 })
                               ) : (
-                                [
-                                  { ref: 'PO-2026-0001', sup: 'Himalayan Yarn Co.', dt: '2026-10-08', kg: 1200, rate: '₹260', st: 'confirmed' },
-                                  { ref: 'PO-2026-0002', sup: 'Deccan Fibres Ltd.', dt: '2026-10-09', kg: 800, rate: '₹310', st: 'draft' },
-                                ].map((po, idx) => (
-                                  <tr key={idx}>
-                                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{po.ref}</td>
-                                    <td>{po.sup}</td>
-                                    <td>{po.dt}</td>
-                                    <td className="tabular-nums">{po.kg.toLocaleString()} kg</td>
-                                    <td className="tabular-nums">{po.rate}</td>
-                                    <td>
-                                      <span className={`erp-badge status-${po.st}`}>{po.st}</span>
-                                    </td>
-                                    <td>
-                                      <button
-                                        type="button"
-                                        className="erp-btn-secondary"
-                                        style={{ height: '28px', padding: '0 8px', fontSize: '11px' }}
-                                        onClick={() => setToastMessage(`Inward gate entry verified for ${po.ref}`)}
-                                      >
-                                        Verify
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))
+                                <tr>
+                                  <td colSpan={7}>
+                                    <div className="erp-empty-card">
+                                      <div className="erp-empty-icon"><Package size={22} /></div>
+                                      <span className="erp-empty-title">No Purchase Orders</span>
+                                      <span className="erp-empty-desc">Create a yarn procurement PO from the top action button.</span>
+                                    </div>
+                                  </td>
+                                </tr>
                               )}
                             </tbody>
                           </table>
@@ -2562,72 +2654,222 @@ export default function App() {
                                       {renderRollStatusBadge(r.status)}
                                     </td>
                                     <td>
-                                      <button
-                                        type="button"
-                                        className="erp-btn-secondary"
-                                        style={{ height: '28px', padding: '0 8px', fontSize: '11px' }}
-                                        onClick={() => setToastMessage(`Lab ASTM certificate generated for ${r.roll_number || r.id}`)}
-                                      >
-                                        Lab Cert
-                                      </button>
+                                      {r.status === 'awaiting_qc' ? (
+                                        <button type="button" className="erp-btn-primary" style={{ height: '28px', padding: '0 8px', fontSize: '11px' }} onClick={() => { setInspectRollId(String(r.id)); setInspectModalOpen(true); }}>Inspect</button>
+                                      ) : r.status === 'passed' ? (
+                                        <button type="button" className="erp-btn-secondary" style={{ height: '28px', padding: '0 8px', fontSize: '11px' }} onClick={async () => { try { await MillAPI.moveRollToStore(r.id); setToastMessage(`Roll ${r.roll_number} moved to store`); fetchAllLiveData(); } catch(err) { setToastMessage(err.message); } }}>→ Store</button>
+                                      ) : (
+                                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>{r.status}</span>
+                                      )}
                                     </td>
                                   </tr>
                                 ))
                               ) : (
-                                [
-                                  { no: 'ROL-2026-001', m: '120.5 m', w: '34.2 kg', gr: 'Grade A', st: 'passed' },
-                                  { no: 'ROL-2026-002', m: '118.0 m', w: '33.8 kg', gr: 'Grade A', st: 'passed' },
-                                  { no: 'ROL-2026-003', m: '95.4 m', w: '27.1 kg', gr: 'Grade B', st: 'awaiting_qc' },
-                                ].map((r, idx) => (
-                                  <tr key={idx}>
-                                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{r.no}</td>
-                                    <td className="tabular-nums">{r.m}</td>
-                                    <td className="tabular-nums">{r.w}</td>
-                                    <td>{renderQCGradeBadge(r.gr)}</td>
-                                    <td>{renderRollStatusBadge(r.st)}</td>
-                                    <td>
-                                      <button
-                                        type="button"
-                                        className="erp-btn-secondary"
-                                        style={{ height: '28px', padding: '0 8px', fontSize: '11px' }}
-                                        onClick={() => setToastMessage(`QC inspection recorded for ${r.no}`)}
-                                      >
-                                        Inspect
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))
+                                <tr>
+                                  <td colSpan={6}>
+                                    <div className="erp-empty-card">
+                                      <div className="erp-empty-icon"><Layers size={22} /></div>
+                                      <span className="erp-empty-title">No Fabric Rolls</span>
+                                      <span className="erp-empty-desc">Rolls appear here once production runs produce fabric and rolls are created.</span>
+                                    </div>
+                                  </td>
+                                </tr>
                               )}
                             </tbody>
                           </table>
                         )}
 
-                        {/* Customers, Suppliers, Stock Levels, Transfers, Stock Counts, Promotions, Reports Fallback */}
-                        {!['sales-orders', 'purchases', 'inventory', 'machines', 'rolls-qc'].includes(erpSidebarTab) && (
+                        {/* ── DISPATCH SCREEN ────────────────────────── */}
+                        {erpSidebarTab === 'transfers' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                              <button type="button" className="erp-btn-primary" onClick={() => setDispatchModalOpen(true)}>
+                                <Truck size={14} /> Dispatch Rolls
+                              </button>
+                            </div>
+                            <table className="erp-data-table">
+                              <thead><tr><th>INVOICE REF</th><th>BUYER</th><th>DATE</th><th>TOTAL (₹)</th><th>PAID</th><th>STATUS</th></tr></thead>
+                              <tbody>
+                                {liveInvoices.filter(i => i.invoice_type === 'sale').length > 0 ? liveInvoices.filter(i => i.invoice_type === 'sale').map(inv => (
+                                  <tr key={inv.id}>
+                                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{inv.ref}</td>
+                                    <td>{liveBuyers.find(b => b.id === inv.buyer_id)?.name || `Buyer #${inv.buyer_id}`}</td>
+                                    <td>{inv.invoice_date}</td>
+                                    <td className="tabular-nums">₹{((inv.total_paise || 0) / 100).toFixed(0)}</td>
+                                    <td className="tabular-nums">₹{((inv.paid_paise || 0) / 100).toFixed(0)}</td>
+                                    <td><span className={`erp-badge status-${(inv.status || 'sent').toLowerCase()}`}>{inv.status || 'sent'}</span></td>
+                                  </tr>
+                                )) : (
+                                  <tr><td colSpan={6}>
+                                    <div className="erp-empty-card">
+                                      <div className="erp-empty-icon"><Truck size={22} /></div>
+                                      <span className="erp-empty-title">No Dispatches Yet</span>
+                                      <span className="erp-empty-desc">Use the Dispatch Rolls button to create the first shipment.</span>
+                                    </div>
+                                  </td></tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+
+                        {/* ── WORKFORCE / ATTENDANCE SCREEN ──────────── */}
+                        {erpSidebarTab === 'customers' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', background: 'var(--surface)', borderRadius: '10px', padding: '14px 18px', border: '1px solid var(--border)' }}>
+                              <span style={{ fontWeight: 600, fontSize: '13px', marginRight: '12px' }}>Log Attendance</span>
+                              <input className="erp-input" style={{ width: '120px' }} placeholder="Worker UID" value={attWorkerUid} onChange={e => setAttWorkerUid(e.target.value)} />
+                              <input className="erp-input" style={{ width: '140px' }} type="date" value={attDate} onChange={e => setAttDate(e.target.value)} />
+                              <input className="erp-input" style={{ width: '160px' }} placeholder="Shift (e.g. 06:00-14:00)" value={attShift} onChange={e => setAttShift(e.target.value)} />
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                                <input type="checkbox" checked={attPresent} onChange={e => setAttPresent(e.target.checked)} /> Present
+                              </label>
+                              <button type="button" className="erp-btn-primary" onClick={async () => {
+                                if (!attWorkerUid.trim()) { setToastMessage('Worker UID is required'); return; }
+                                try {
+                                  await MillAPI.recordAttendance({ worker_uid: attWorkerUid.trim(), work_date: attDate, shift: attShift, is_present: attPresent });
+                                  setToastMessage('✓ Attendance logged');
+                                  setAttWorkerUid('');
+                                  fetchAllLiveData();
+                                } catch(err) { setToastMessage(`Failed: ${err.message}`); }
+                              }}>Log</button>
+                            </div>
+                            <table className="erp-data-table">
+                              <thead><tr><th>WORKER</th><th>DATE</th><th>SHIFT</th><th>PRESENT</th><th>MINS WORKED</th></tr></thead>
+                              <tbody>
+                                {liveAttendance.length > 0 ? liveAttendance.slice(0, 50).map((a, i) => (
+                                  <tr key={a.id || i}>
+                                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{a.worker_uid || a.worker_id}</td>
+                                    <td>{a.work_date}</td>
+                                    <td>{a.shift || '-'}</td>
+                                    <td>{a.is_present ? <span className="erp-badge status-active">Present</span> : <span className="erp-badge status-draft">Absent</span>}</td>
+                                    <td className="tabular-nums">{a.minutes_worked ?? (a.is_present ? 480 : 0)} min</td>
+                                  </tr>
+                                )) : (
+                                  <tr><td colSpan={5}>
+                                    <div className="erp-empty-card">
+                                      <div className="erp-empty-icon"><Users size={22} /></div>
+                                      <span className="erp-empty-title">No Attendance Records</span>
+                                      <span className="erp-empty-desc">Log the first attendance entry above.</span>
+                                    </div>
+                                  </td></tr>
+                                )}
+                              </tbody>
+                            </table>
+                            <div style={{ marginTop: '8px' }}>
+                              <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '10px' }}>Wage Runs</div>
+                              <table className="erp-data-table">
+                                <thead><tr><th>PERIOD</th><th>STATUS</th><th>TOTAL WAGES (₹)</th></tr></thead>
+                                <tbody>
+                                  {liveWageRuns.length > 0 ? liveWageRuns.map((w, i) => (
+                                    <tr key={w.id || i}>
+                                      <td>{w.period_start || '-'} → {w.period_end || '-'}</td>
+                                      <td><span className={`erp-badge status-${w.status || 'draft'}`}>{w.status || 'draft'}</span></td>
+                                      <td className="tabular-nums">₹{((w.total_wages_paise || 0) / 100).toFixed(0)}</td>
+                                    </tr>
+                                  )) : (
+                                    <tr><td colSpan={3}><span style={{ padding: '12px', display: 'block', color: '#94a3b8', fontSize: '13px' }}>No wage runs processed yet.</span></td></tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── ORDER TRACKING SCREEN ──────────────────── */}
+                        {erpSidebarTab === 'stock-levels' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', background: 'var(--surface)', borderRadius: '10px', padding: '14px 18px', border: '1px solid var(--border)' }}>
+                              <span style={{ fontWeight: 600, fontSize: '13px', marginRight: '12px' }}>Track Order</span>
+                              <select className="erp-input" style={{ width: '200px' }} value={trackOrderId} onChange={e => setTrackOrderId(e.target.value)}>
+                                <option value="">— Select Order —</option>
+                                {liveOrders.map(o => <option key={o.id} value={o.id}>{o.ref} · {o.buyer_name}</option>)}
+                              </select>
+                              <button type="button" className="erp-btn-primary" onClick={async () => {
+                                if (!trackOrderId) { setToastMessage('Select an order first'); return; }
+                                try {
+                                  const res = await MillAPI.getOrderTracking(trackOrderId);
+                                  setTrackResult(res);
+                                } catch(err) { setToastMessage(`Failed: ${err.message}`); setTrackResult(null); }
+                              }}>Track</button>
+                            </div>
+                            {trackResult ? (
+                              <div style={{ background: 'var(--surface)', borderRadius: '12px', padding: '20px', border: '1px solid var(--border)' }}>
+                                <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '12px' }}>Order {trackResult.ref} — {trackResult.buyer_name}</div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                                  {[['Status', trackResult.status], ['Ordered (m)', trackResult.qty_ordered_m], ['Passed (m)', trackResult.qty_passed_m], ['Dispatched (m)', trackResult.qty_dispatched_m], ['Delivery Date', trackResult.delivery_date], ['Days Left', trackResult.days_left ?? 'N/A']].map(([lbl, val]) => (
+                                    <div key={lbl} style={{ background: 'var(--bg)', borderRadius: '8px', padding: '10px 14px' }}>
+                                      <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{lbl}</div>
+                                      <div style={{ fontWeight: 700, fontSize: '15px', marginTop: '4px' }}>{val ?? '—'}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                                {trackResult.runs?.length > 0 && (
+                                  <><div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>Production Runs</div>
+                                  <table className="erp-data-table"><thead><tr><th>RUN ID</th><th>MACHINE</th><th>STAGE</th><th>STATUS</th></tr></thead>
+                                  <tbody>{trackResult.runs.map(r => <tr key={r.id}><td>#{r.id}</td><td>{r.machine_code}</td><td>{r.current_stage}</td><td>{r.status}</td></tr>)}</tbody></table></>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="erp-empty-card" style={{ padding: '40px 24px' }}>
+                                <div className="erp-empty-icon"><ClipboardList size={22} /></div>
+                                <span className="erp-empty-title">Order Tracking</span>
+                                <span className="erp-empty-desc">Select an order above to see its live production, QC, and dispatch progress.</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* ── FINANCIAL SUMMARY SCREEN ───────────────── */}
+                        {erpSidebarTab === 'reports' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', background: 'var(--surface)', borderRadius: '10px', padding: '14px 18px', border: '1px solid var(--border)' }}>
+                              <span style={{ fontWeight: 600, fontSize: '13px', marginRight: '12px' }}>Financial Summary</span>
+                              <input className="erp-input" style={{ width: '90px' }} type="number" min="2020" max="2099" value={finYear} onChange={e => setFinYear(Number(e.target.value))} />
+                              <select className="erp-input" style={{ width: '130px' }} value={finMonth} onChange={e => setFinMonth(Number(e.target.value))}>
+                                {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, i) => <option key={m} value={i+1}>{m}</option>)}
+                              </select>
+                              <button type="button" className="erp-btn-primary" onClick={() => fetchFinancialSummary(finYear, finMonth)} disabled={finSummaryLoading}>
+                                {finSummaryLoading ? 'Loading…' : 'Load'}
+                              </button>
+                            </div>
+                            {liveFinancialSummary ? (
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                                {[['Revenue (₹)', ((liveFinancialSummary.revenue_paise || 0) / 100).toFixed(0)],
+                                  ['Material Cost (₹)', ((liveFinancialSummary.material_cost_paise || 0) / 100).toFixed(0)],
+                                  ['Wage Cost (₹)', ((liveFinancialSummary.wage_cost_paise || 0) / 100).toFixed(0)],
+                                  ['Overhead Cost (₹)', ((liveFinancialSummary.overhead_paise || 0) / 100).toFixed(0)],
+                                  ['Gross Profit (₹)', ((liveFinancialSummary.gross_profit_paise || 0) / 100).toFixed(0)],
+                                  ['Invoices Raised', liveFinancialSummary.invoice_count ?? '—'],
+                                  ['Dispatches', liveFinancialSummary.dispatch_count ?? '—'],
+                                  ['Outstanding (₹)', ((liveFinancialSummary.outstanding_paise || 0) / 100).toFixed(0)],
+                                ].map(([lbl, val]) => (
+                                  <div key={lbl} style={{ background: 'var(--surface)', borderRadius: '12px', padding: '18px 22px', border: '1px solid var(--border)' }}>
+                                    <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{lbl}</div>
+                                    <div style={{ fontWeight: 800, fontSize: '22px', marginTop: '6px', color: 'var(--accent)' }}>{Number(val).toLocaleString()}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="erp-empty-card" style={{ padding: '50px 24px' }}>
+                                <div className="erp-empty-icon"><BarChart3 size={24} /></div>
+                                <span className="erp-empty-title">No Data Loaded</span>
+                                <span className="erp-empty-desc">Pick a year and month, then click Load to fetch the financial summary.</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* ── OTHER PLACEHOLDER TABS ─────────────────── */}
+                        {!['sales-orders','purchases','inventory','machines','rolls-qc','transfers','customers','stock-levels','reports'].includes(erpSidebarTab) && (
                           <div className="erp-empty-card" style={{ padding: '60px 24px' }}>
                             <div className="erp-empty-icon">
-                              {erpSidebarTab === 'customers' && <Users size={24} />}
                               {erpSidebarTab === 'suppliers' && <Building2 size={24} />}
                               {erpSidebarTab === 'promotions' && <Tag size={24} />}
-                              {erpSidebarTab === 'stock-levels' && <Package size={24} />}
-                              {erpSidebarTab === 'transfers' && <ArrowLeftRight size={24} />}
                               {erpSidebarTab === 'stock-counts' && <ClipboardList size={24} />}
-                              {erpSidebarTab === 'reports' && <BarChart3 size={24} />}
                             </div>
-                            <span className="erp-empty-title">
-                              {erpSidebarTab === 'customers' && 'Active Buyers & Fashion Houses'}
-                              {erpSidebarTab === 'suppliers' && 'Yarn & Spinning Mill Suppliers'}
-                              {erpSidebarTab === 'promotions' && 'Volume Promotions & Discounts'}
-                              {erpSidebarTab === 'stock-levels' && 'Store Location Inventory (RAW & FIN)'}
-                              {erpSidebarTab === 'transfers' && 'Floor & Shed Movement Logs'}
-                              {erpSidebarTab === 'stock-counts' && 'Reconciliation & Physical Audits'}
-                              {erpSidebarTab === 'reports' && 'Textile Production & Profitability Reports'}
-                            </span>
-                            <span className="erp-empty-desc">
-                              {erpSidebarTab === 'reports'
-                                ? 'Looms Utilization: 91.4% · Weft Waste: 1.8% · Lab Pass Rate: 98.2% · On-Time Dispatch: 96.5%'
-                                : 'All records are synced directly with the Khadira Textile Mills FastAPI database.'}
-                            </span>
+                            <span className="erp-empty-title">Module Coming Soon</span>
+                            <span className="erp-empty-desc">All records are synced directly with the Khadira Textile Mills FastAPI database.</span>
                           </div>
                         )}
                       </div>
@@ -2638,8 +2880,145 @@ export default function App() {
             </div>
           </section>
 
+          {/* ── DISPATCH ROLLS MODAL ─────────────────────────────────── */}
+          {dispatchModalOpen && (
+            <div className="erp-modal-overlay" onClick={() => setDispatchModalOpen(false)}>
+              <div className="erp-modal-window" onClick={e => e.stopPropagation()}>
+                <div className="erp-modal-header">
+                  <h3 className="erp-modal-title">Dispatch Rolls to Buyer</h3>
+                  <button type="button" className="erp-modal-close-btn" onClick={() => setDispatchModalOpen(false)}><X size={18} /></button>
+                </div>
+                <form className="erp-modal-body" onSubmit={async e => {
+                  e.preventDefault();
+                  const ids = dispatchRollIds.split(',').map(s => Number(s.trim())).filter(Boolean);
+                  if (!ids.length) { setToastMessage('Enter at least one Roll ID'); return; }
+                  try {
+                    await MillAPI.dispatchRolls({
+                      roll_ids: ids,
+                      dispatch_date: new Date().toISOString().split('T')[0],
+                      buyer_id: Number(dispatchBuyerId) || null,
+                      order_id: Number(dispatchOrderId) || null,
+                      vehicle_no: dispatchVehicle || null,
+                    });
+                    setToastMessage('✓ Dispatch created with invoice');
+                    setDispatchModalOpen(false);
+                    setDispatchRollIds('');
+                    fetchAllLiveData();
+                  } catch(err) { setToastMessage(`Dispatch failed: ${err.message}`); }
+                }}>
+                  <div className="erp-field"><label className="erp-label">Roll IDs (comma-separated) *</label>
+                    <input className="erp-input" placeholder="e.g. 1,2,3" value={dispatchRollIds} onChange={e => setDispatchRollIds(e.target.value)} required /></div>
+                  <div className="erp-field"><label className="erp-label">Buyer</label>
+                    <select className="erp-input" value={dispatchBuyerId} onChange={e => setDispatchBuyerId(e.target.value)}>
+                      <option value="">— Select Buyer —</option>
+                      {liveBuyers.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select></div>
+                  <div className="erp-field"><label className="erp-label">Sales Order</label>
+                    <select className="erp-input" value={dispatchOrderId} onChange={e => setDispatchOrderId(e.target.value)}>
+                      <option value="">— Select Order —</option>
+                      {liveOrders.filter(o => ['confirmed','in_production'].includes(o.status)).map(o => <option key={o.id} value={o.id}>{o.ref}</option>)}
+                    </select></div>
+                  <div className="erp-field"><label className="erp-label">Vehicle No.</label>
+                    <input className="erp-input" placeholder="e.g. KA-05-EX-1234" value={dispatchVehicle} onChange={e => setDispatchVehicle(e.target.value)} /></div>
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '8px' }}>
+                    <button type="button" className="erp-btn-secondary" onClick={() => setDispatchModalOpen(false)}>Cancel</button>
+                    <button type="submit" className="erp-btn-primary">Dispatch &amp; Invoice</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ── RECEIVE YARN MODAL ───────────────────────────────────── */}
+          {receiveModalOpen && (
+            <div className="erp-modal-overlay" onClick={() => setReceiveModalOpen(false)}>
+              <div className="erp-modal-window" onClick={e => e.stopPropagation()}>
+                <div className="erp-modal-header">
+                  <h3 className="erp-modal-title">Receive Yarn Against PO</h3>
+                  <button type="button" className="erp-modal-close-btn" onClick={() => setReceiveModalOpen(false)}><X size={18} /></button>
+                </div>
+                <form className="erp-modal-body" onSubmit={async e => {
+                  e.preventDefault();
+                  if (!receivePOId) { setToastMessage('Select a PO'); return; }
+                  try {
+                    await MillAPI.receiveYarn(Number(receivePOId), {
+                      lot_number: receiveLotNo.trim() || `LOT-${Date.now()}`,
+                      qty_kg: Number(receiveQtyKg),
+                    });
+                    setToastMessage('✓ Yarn received — lot created, stock updated');
+                    setReceiveModalOpen(false);
+                    setReceiveLotNo(''); setReceiveQtyKg(''); setReceivePOId('');
+                    fetchAllLiveData();
+                  } catch(err) { setToastMessage(`Receipt failed: ${err.message}`); }
+                }}>
+                  <div className="erp-field"><label className="erp-label">Purchase Order *</label>
+                    <select className="erp-input" value={receivePOId} onChange={e => setReceivePOId(e.target.value)} required>
+                      <option value="">— Select PO —</option>
+                      {livePOs.filter(p => p.status === 'confirmed').map(p => <option key={p.id} value={p.id}>{p.ref} · {p.supplier_name}</option>)}
+                    </select></div>
+                  <div className="erp-field"><label className="erp-label">Lot Number</label>
+                    <input className="erp-input" placeholder="e.g. LOT-APEX-40S-01" value={receiveLotNo} onChange={e => setReceiveLotNo(e.target.value)} /></div>
+                  <div className="erp-field"><label className="erp-label">Quantity (kg) *</label>
+                    <input className="erp-input" type="number" min="1" placeholder="e.g. 500" value={receiveQtyKg} onChange={e => setReceiveQtyKg(e.target.value)} required /></div>
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '8px' }}>
+                    <button type="button" className="erp-btn-secondary" onClick={() => setReceiveModalOpen(false)}>Cancel</button>
+                    <button type="submit" className="erp-btn-primary">Receive Yarn</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ── INSPECT ROLL MODAL ──────────────────────────────────── */}
+          {inspectModalOpen && (
+            <div className="erp-modal-overlay" onClick={() => setInspectModalOpen(false)}>
+              <div className="erp-modal-window" onClick={e => e.stopPropagation()}>
+                <div className="erp-modal-header">
+                  <h3 className="erp-modal-title">QC Inspection — Roll</h3>
+                  <button type="button" className="erp-modal-close-btn" onClick={() => setInspectModalOpen(false)}><X size={18} /></button>
+                </div>
+                <form className="erp-modal-body" onSubmit={async e => {
+                  e.preventDefault();
+                  if (!inspectRollId) { setToastMessage('Select a roll'); return; }
+                  try {
+                    await MillAPI.inspectRoll(Number(inspectRollId), inspectVerdict, inspectVerdict === 'rework' ? null : inspectGrade, inspectNote);
+                    setToastMessage(`✓ Roll ${inspectRollId} marked as ${inspectVerdict}`);
+                    setInspectModalOpen(false);
+                    setInspectRollId(''); setInspectNote('');
+                    fetchAllLiveData();
+                  } catch(err) { setToastMessage(`Inspection failed: ${err.message}`); }
+                }}>
+                  <div className="erp-field"><label className="erp-label">Roll *</label>
+                    <select className="erp-input" value={inspectRollId} onChange={e => setInspectRollId(e.target.value)} required>
+                      <option value="">— Select Roll —</option>
+                      {liveRolls.filter(r => r.status === 'awaiting_qc').map(r => <option key={r.id} value={r.id}>{r.roll_number} — {r.length_m ?? (r.length_cm/100).toFixed(0)} m</option>)}
+                    </select></div>
+                  <div className="erp-field"><label className="erp-label">Verdict *</label>
+                    <select className="erp-input" value={inspectVerdict} onChange={e => setInspectVerdict(e.target.value)}>
+                      <option value="pass">Pass</option>
+                      <option value="rework">Rework</option>
+                      <option value="reject">Reject</option>
+                    </select></div>
+                  {inspectVerdict !== 'rework' && (
+                    <div className="erp-field"><label className="erp-label">QC Grade</label>
+                      <select className="erp-input" value={inspectGrade} onChange={e => setInspectGrade(e.target.value)}>
+                        <option value="A">Grade A</option><option value="B">Grade B</option><option value="C">Grade C</option>
+                      </select></div>
+                  )}
+                  <div className="erp-field"><label className="erp-label">Note</label>
+                    <input className="erp-input" placeholder="e.g. Clear weave, no defects" value={inspectNote} onChange={e => setInspectNote(e.target.value)} /></div>
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '8px' }}>
+                    <button type="button" className="erp-btn-secondary" onClick={() => setInspectModalOpen(false)}>Cancel</button>
+                    <button type="submit" className="erp-btn-primary">Record Verdict</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
           {/* Unified Create Entry Modal */}
           {isCreateModalOpen && (
+
             <div className="erp-modal-overlay" onClick={() => setIsCreateModalOpen(false)}>
               <div className="erp-modal-window" onClick={(e) => e.stopPropagation()}>
                 <div className="erp-modal-header">
@@ -2664,29 +3043,79 @@ export default function App() {
                     e.preventDefault();
                     try {
                       if (createModalType === 'order') {
+                        const selectedItemId = Number(newOrderItemId) || fabricItems[0]?.id || 7;
+                        const selectedBuyerId = Number(newOrderBuyerId) || liveBuyers[0]?.id || 1;
+                        const meters = Number(newOrderMeters) || 1200;
+                        const ratePaise = Math.round((Number(newOrderRate) || 85) * 100);
+                        const buyerObj = liveBuyers.find((b) => b.id === selectedBuyerId);
+                        const buyerName = buyerObj?.name || newOrderBuyerName || 'Customer';
+
                         await MillAPI.createOrder({
-                          buyer_id: liveBuyers[0]?.id || 1,
+                          buyer_id: selectedBuyerId,
                           order_date: new Date().toISOString().split('T')[0],
+                          delivery_date: newOrderDeliveryDate || null,
                           lines: [{
-                            item_id: liveItems[0]?.id || 5,
-                            qty_meters: Number(newOrderMeters) || 1200,
-                            rate_per_meter_paise: (Number(newOrderRate) || 85) * 100,
+                            item_id: selectedItemId,
+                            qty_meters: meters,
+                            rate_per_meter_paise: ratePaise,
                           }],
-                          notes: `Order for ${newOrderBuyerName}`,
+                          notes: newOrderNotes || `Order for ${buyerName}`,
                         });
-                        setToastMessage('Sales order created successfully!');
+                        setToastMessage('✓ Sales order created successfully!');
                       } else if (createModalType === 'purchase') {
+                        const selectedItemId = Number(newPOItemId) || yarnItems[0]?.id || 1;
+                        const selectedSupplierId = Number(newPOSupplierId) || liveSuppliers[0]?.id || 1;
+                        const kg = Number(newOrderMeters) || 1000;
+                        const ratePaise = Math.round((Number(newOrderRate) || 250) * 100);
+
                         await MillAPI.createPO({
-                          supplier_id: liveSuppliers[0]?.id || 1,
+                          supplier_id: selectedSupplierId,
                           order_date: new Date().toISOString().split('T')[0],
                           lines: [{
-                            item_id: liveItems[0]?.id || 1,
-                            qty_kg: 1000,
-                            rate_per_kg_paise: 25000,
+                            item_id: selectedItemId,
+                            qty_kg: kg,
+                            rate_per_kg_paise: ratePaise,
                           }],
-                          notes: 'Yarn procurement intake',
+                          notes: newOrderNotes || 'Yarn procurement intake',
                         });
-                        setToastMessage('Purchase order created successfully!');
+                        setToastMessage('✓ Purchase order created successfully!');
+                      } else if (createModalType === 'customer') {
+                        await MillAPI.createBuyer({
+                          name: newOrderBuyerName.trim(),
+                          contact_name: newEntityContact.trim() || 'Procurement Desk',
+                          phone: newEntityPhone.trim() || null,
+                          email: newEntityEmail.trim() || null,
+                          credit_days: 30,
+                        });
+                        setToastMessage('✓ Buyer registered successfully!');
+                      } else if (createModalType === 'supplier') {
+                        await MillAPI.createSupplier({
+                          name: newOrderBuyerName.trim(),
+                          contact_name: newEntityContact.trim() || 'Sales Representative',
+                          phone: newEntityPhone.trim() || null,
+                          email: newEntityEmail.trim() || null,
+                        });
+                        setToastMessage('✓ Yarn Supplier registered successfully!');
+                      } else if (createModalType === 'item') {
+                        const isFabric = newItemType === 'fabric';
+                        const sku = newItemSku.trim() || `${isFabric ? 'FAB' : 'YRN'}-${Date.now().toString().slice(-4)}`;
+                        await MillAPI.createItem({
+                          sku,
+                          name: newOrderBuyerName.trim(),
+                          item_type: newItemType,
+                          unit: isFabric ? 'm' : 'kg',
+                          yarn_kg_per_meter: isFabric ? 0.18 : null,
+                          reorder_point_kg: 500,
+                        });
+                        setToastMessage('✓ Catalogue material added successfully!');
+                      } else if (createModalType === 'machine') {
+                        const code = newMachineCode.trim() || `MC-${Date.now().toString().slice(-3)}`;
+                        await MillAPI.createMachine(
+                          code,
+                          newOrderBuyerName.trim() || `Loom ${code}`,
+                          newMachineType || 'weaving'
+                        );
+                        setToastMessage('✓ Machine registered successfully!');
                       } else {
                         setToastMessage('Entry created and registered in database');
                       }
@@ -2698,41 +3127,370 @@ export default function App() {
                   }}
                   className="erp-modal-body"
                 >
-                  <div className="erp-field">
-                    <label className="erp-label">Entity Name / Reference</label>
-                    <input
-                      type="text"
-                      className="erp-input"
-                      placeholder="e.g. Metro Garments Pvt Ltd"
-                      value={newOrderBuyerName}
-                      onChange={(e) => setNewOrderBuyerName(e.target.value)}
-                      required
-                    />
-                  </div>
+                  {createModalType === 'order' && (
+                    <>
+                      <div className="erp-field">
+                        <label className="erp-label">Fabric Product (Catalogue Item) *</label>
+                        <select
+                          className="erp-input"
+                          value={newOrderItemId || (fabricItems[0]?.id ? String(fabricItems[0].id) : '')}
+                          onChange={(e) => setNewOrderItemId(e.target.value)}
+                          required
+                        >
+                          {fabricItems.length > 0 ? (
+                            fabricItems.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.name} ({item.sku || `ID-${item.id}`})
+                              </option>
+                            ))
+                          ) : (
+                            <option value="">No fabric items found in catalogue</option>
+                          )}
+                        </select>
+                        <span style={{ fontSize: '11px', color: '#64748B' }}>
+                          Sales orders require fabric items (e.g. Poplin, Twill, Satin).
+                        </span>
+                      </div>
 
-                  <div className="erp-field">
-                    <label className="erp-label">Quantity (Meters or KG)</label>
-                    <input
-                      type="number"
-                      className="erp-input"
-                      placeholder="1200"
-                      value={newOrderMeters}
-                      onChange={(e) => setNewOrderMeters(e.target.value)}
-                      required
-                    />
-                  </div>
+                      <div className="erp-field">
+                        <label className="erp-label">Buyer / Customer *</label>
+                        <select
+                          className="erp-input"
+                          value={newOrderBuyerId || (liveBuyers[0]?.id ? String(liveBuyers[0].id) : '')}
+                          onChange={(e) => {
+                            setNewOrderBuyerId(e.target.value);
+                            const buyer = liveBuyers.find((b) => String(b.id) === String(e.target.value));
+                            if (buyer) setNewOrderBuyerName(buyer.name);
+                          }}
+                          required
+                        >
+                          {liveBuyers.length > 0 ? (
+                            liveBuyers.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.name}
+                              </option>
+                            ))
+                          ) : (
+                            <option value="1">Sunrise Garments Pvt. Ltd.</option>
+                          )}
+                        </select>
+                      </div>
 
-                  <div className="erp-field">
-                    <label className="erp-label">Unit Rate (₹ per unit)</label>
-                    <input
-                      type="number"
-                      className="erp-input"
-                      placeholder="85"
-                      value={newOrderRate}
-                      onChange={(e) => setNewOrderRate(e.target.value)}
-                      required
-                    />
-                  </div>
+                      <div className="erp-field">
+                        <label className="erp-label">Quantity (Meters) *</label>
+                        <input
+                          type="number"
+                          className="erp-input"
+                          placeholder="1200"
+                          min="1"
+                          step="1"
+                          value={newOrderMeters}
+                          onChange={(e) => setNewOrderMeters(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="erp-field">
+                        <label className="erp-label">Unit Rate (₹ per Meter) *</label>
+                        <input
+                          type="number"
+                          className="erp-input"
+                          placeholder="85"
+                          min="1"
+                          step="0.5"
+                          value={newOrderRate}
+                          onChange={(e) => setNewOrderRate(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="erp-field">
+                        <label className="erp-label">Target Delivery Date (Optional)</label>
+                        <input
+                          type="date"
+                          className="erp-input"
+                          value={newOrderDeliveryDate}
+                          onChange={(e) => setNewOrderDeliveryDate(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="erp-field">
+                        <label className="erp-label">Order Notes / PO Ref (Optional)</label>
+                        <input
+                          type="text"
+                          className="erp-input"
+                          placeholder="e.g. Autumn export lot / Buyer PO #901"
+                          value={newOrderNotes}
+                          onChange={(e) => setNewOrderNotes(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {createModalType === 'purchase' && (
+                    <>
+                      <div className="erp-field">
+                        <label className="erp-label">Yarn Material (Item) *</label>
+                        <select
+                          className="erp-input"
+                          value={newPOItemId || (yarnItems[0]?.id ? String(yarnItems[0].id) : '')}
+                          onChange={(e) => setNewPOItemId(e.target.value)}
+                          required
+                        >
+                          {yarnItems.length > 0 ? (
+                            yarnItems.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.name} ({item.sku || `ID-${item.id}`})
+                              </option>
+                            ))
+                          ) : (
+                            <option value="">No yarn items found in catalogue</option>
+                          )}
+                        </select>
+                        <span style={{ fontSize: '11px', color: '#64748B' }}>
+                          Purchase orders require raw yarn items.
+                        </span>
+                      </div>
+
+                      <div className="erp-field">
+                        <label className="erp-label">Yarn Supplier *</label>
+                        <select
+                          className="erp-input"
+                          value={newPOSupplierId || (liveSuppliers[0]?.id ? String(liveSuppliers[0].id) : '')}
+                          onChange={(e) => setNewPOSupplierId(e.target.value)}
+                          required
+                        >
+                          {liveSuppliers.length > 0 ? (
+                            liveSuppliers.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.name}
+                              </option>
+                            ))
+                          ) : (
+                            <option value="1">Himalayan Yarn Co.</option>
+                          )}
+                        </select>
+                      </div>
+
+                      <div className="erp-field">
+                        <label className="erp-label">Quantity (KG) *</label>
+                        <input
+                          type="number"
+                          className="erp-input"
+                          placeholder="1000"
+                          min="1"
+                          step="1"
+                          value={newOrderMeters}
+                          onChange={(e) => setNewOrderMeters(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="erp-field">
+                        <label className="erp-label">Unit Rate (₹ per KG) *</label>
+                        <input
+                          type="number"
+                          className="erp-input"
+                          placeholder="250"
+                          min="1"
+                          step="0.5"
+                          value={newOrderRate}
+                          onChange={(e) => setNewOrderRate(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="erp-field">
+                        <label className="erp-label">PO Notes / Reference</label>
+                        <input
+                          type="text"
+                          className="erp-input"
+                          placeholder="e.g. Ring spun lot intake"
+                          value={newOrderNotes}
+                          onChange={(e) => setNewOrderNotes(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {createModalType === 'customer' && (
+                    <>
+                      <div className="erp-field">
+                        <label className="erp-label">Buyer / Company Name *</label>
+                        <input
+                          type="text"
+                          className="erp-input"
+                          placeholder="e.g. Raymond Lifestyle Ltd."
+                          value={newOrderBuyerName}
+                          onChange={(e) => setNewOrderBuyerName(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="erp-field">
+                        <label className="erp-label">Contact Person</label>
+                        <input
+                          type="text"
+                          className="erp-input"
+                          placeholder="e.g. Rajesh Kumar"
+                          value={newEntityContact}
+                          onChange={(e) => setNewEntityContact(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="erp-field">
+                        <label className="erp-label">Phone Number</label>
+                        <input
+                          type="tel"
+                          className="erp-input"
+                          placeholder="+91 98765 43210"
+                          value={newEntityPhone}
+                          onChange={(e) => setNewEntityPhone(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="erp-field">
+                        <label className="erp-label">Email Address</label>
+                        <input
+                          type="email"
+                          className="erp-input"
+                          placeholder="procurement@raymond.in"
+                          value={newEntityEmail}
+                          onChange={(e) => setNewEntityEmail(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {createModalType === 'supplier' && (
+                    <>
+                      <div className="erp-field">
+                        <label className="erp-label">Supplier Name *</label>
+                        <input
+                          type="text"
+                          className="erp-input"
+                          placeholder="e.g. Gujarat Spinners Corp."
+                          value={newOrderBuyerName}
+                          onChange={(e) => setNewOrderBuyerName(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="erp-field">
+                        <label className="erp-label">Contact Person</label>
+                        <input
+                          type="text"
+                          className="erp-input"
+                          placeholder="e.g. Amit Desai"
+                          value={newEntityContact}
+                          onChange={(e) => setNewEntityContact(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="erp-field">
+                        <label className="erp-label">Phone Number</label>
+                        <input
+                          type="tel"
+                          className="erp-input"
+                          placeholder="+91 98220 11223"
+                          value={newEntityPhone}
+                          onChange={(e) => setNewEntityPhone(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="erp-field">
+                        <label className="erp-label">Email Address</label>
+                        <input
+                          type="email"
+                          className="erp-input"
+                          placeholder="sales@gujaratspinners.com"
+                          value={newEntityEmail}
+                          onChange={(e) => setNewEntityEmail(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {createModalType === 'item' && (
+                    <>
+                      <div className="erp-field">
+                        <label className="erp-label">Material / Product Name *</label>
+                        <input
+                          type="text"
+                          className="erp-input"
+                          placeholder="e.g. Organic Cotton Cambric"
+                          value={newOrderBuyerName}
+                          onChange={(e) => setNewOrderBuyerName(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="erp-field">
+                        <label className="erp-label">SKU Code *</label>
+                        <input
+                          type="text"
+                          className="erp-input"
+                          placeholder="e.g. FAB-CAM-01"
+                          value={newItemSku}
+                          onChange={(e) => setNewItemSku(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="erp-field">
+                        <label className="erp-label">Catalogue Classification *</label>
+                        <select
+                          className="erp-input"
+                          value={newItemType}
+                          onChange={(e) => setNewItemType(e.target.value)}
+                        >
+                          <option value="fabric">Fabric (Finished Textile)</option>
+                          <option value="yarn">Yarn (Raw Fiber)</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+
+                  {createModalType === 'machine' && (
+                    <>
+                      <div className="erp-field">
+                        <label className="erp-label">Machine / Loom Name *</label>
+                        <input
+                          type="text"
+                          className="erp-input"
+                          placeholder="e.g. Tsudakoma Airjet Loom #09"
+                          value={newOrderBuyerName}
+                          onChange={(e) => setNewOrderBuyerName(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="erp-field">
+                        <label className="erp-label">Machine Code / ID *</label>
+                        <input
+                          type="text"
+                          className="erp-input"
+                          placeholder="e.g. LM-09"
+                          value={newMachineCode}
+                          onChange={(e) => setNewMachineCode(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="erp-field">
+                        <label className="erp-label">Production Process *</label>
+                        <select
+                          className="erp-input"
+                          value={newMachineType}
+                          onChange={(e) => setNewMachineType(e.target.value)}
+                        >
+                          <option value="weaving">Weaving Loom</option>
+                          <option value="spinning">Spinning Frame</option>
+                          <option value="dyeing">Dyeing Vat</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
 
                   <div className="erp-modal-actions">
                     <button

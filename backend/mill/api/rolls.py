@@ -19,7 +19,7 @@ class RollIn(BaseModel):
 
 
 class InspectIn(BaseModel):
-    verdict: str  # passed|failed|held
+    verdict: str  # pass|rework|reject
     grade: str | None = None
     note: str | None = None
 
@@ -61,6 +61,11 @@ def get_roll(roll_id: int, db: Db, _: can["rolls.read"]) -> dict:
     if r is None:
         raise DomainError("Roll not found.", 404)
     return _out(r)
+
+
+@router.get("/{roll_id}/trace")
+def trace_roll(roll_id: int, db: Db, _: can["rolls.read"]) -> dict:
+    return prod_svc.get_roll_trace(db, roll_id)
 
 
 @router.post("/{roll_id}/inspect")

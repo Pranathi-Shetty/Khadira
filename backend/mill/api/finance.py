@@ -1,12 +1,21 @@
 """Finance router: invoices and payments."""
 
 from datetime import date
+from decimal import Decimal
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from ..models import Invoice, InvoiceLine, Payment
+from ..services.common import DomainError
+from ..services.pricing import (
+    compute_fabric_line_total,
+    compute_tax,
+    compute_yarn_line_total,
+    kg_decimal_to_g,
+    meters_decimal_to_cm,
+)
 from .deps import Db, can
 
 router = APIRouter(prefix="/api/finance", tags=["finance"])
@@ -14,9 +23,9 @@ router = APIRouter(prefix="/api/finance", tags=["finance"])
 
 class InvoiceLineIn(BaseModel):
     description: str
-    qty: float
+    qty: Decimal
     unit_price_paise: int
-    tax_pct: float = 0.0
+    tax_pct: Decimal = Decimal("0.00")
 
 
 class InvoiceIn(BaseModel):
@@ -38,21 +47,48 @@ class PaymentIn(BaseModel):
 
 
 def _inv_out(inv: Invoice) -> dict:
-    subtotal = sum(int(l.qty) * l.unit_price_paise for l in inv.lines)
-    tax = sum(int(int(l.qty) * l.unit_price_paise * l.tax_pct / 100) for l in inv.lines)
+    subtotal = 0
+    tax = 0
+    for l in inv.lines:
+        if inv.invoice_type == "sale":
+            cm = meters_decimal_to_cm(l.qty)
+            line_base = compute_fabric_line_total(cm, l.unit_price_paise)
+        else:
+            g = kg_decimal_to_g(l.qty)
+            line_base = compute_yarn_line_total(g, l.unit_price_paise)
+        line_tax = compute_tax(line_base, l.tax_pct)
+        subtotal += line_base
+        tax += line_tax
+
     paid = sum(p.amount_paise for p in inv.payments)
+    total = subtotal + tax
     return {
-        "id": inv.id, "ref": inv.ref, "invoice_type": inv.invoice_type,
-        "buyer_id": inv.buyer_id, "supplier_id": inv.supplier_id,
+        "id": inv.id,
+        "ref": inv.ref,
+        "invoice_type": inv.invoice_type,
+        "buyer_id": inv.buyer_id,
+        "supplier_id": inv.supplier_id,
+        "order_id": inv.order_id,
+        "dispatch_id": inv.dispatch_id,
         "invoice_date": str(inv.invoice_date),
         "due_date": str(inv.due_date) if inv.due_date else None,
         "status": inv.status,
-        "subtotal_paise": subtotal, "tax_paise": tax,
-        "total_paise": subtotal + tax, "paid_paise": paid,
-        "balance_paise": subtotal + tax - paid,
-        "lines": [{"id": l.id, "description": l.description,
-                   "qty": l.qty, "unit_price_paise": l.unit_price_paise,
-                   "tax_pct": l.tax_pct} for l in inv.lines],
+        "amount_paise": total,
+        "subtotal_paise": subtotal,
+        "tax_paise": tax,
+        "total_paise": total,
+        "paid_paise": paid,
+        "balance_paise": total - paid,
+        "lines": [
+            {
+                "id": l.id,
+                "description": l.description,
+                "qty": float(l.qty) if isinstance(l.qty, Decimal) else l.qty,
+                "unit_price_paise": l.unit_price_paise,
+                "tax_pct": float(l.tax_pct) if isinstance(l.tax_pct, Decimal) else l.tax_pct,
+            }
+            for l in inv.lines
+        ],
     }
 
 
@@ -80,14 +116,22 @@ def create_invoice(body: InvoiceIn, db: Db, _: can("finance.write")) -> dict:
     inv = Invoice(
         ref=_next_ref(db, body.invoice_type),
         invoice_type=body.invoice_type,
-        buyer_id=body.buyer_id, supplier_id=body.supplier_id,
-        invoice_date=body.invoice_date, due_date=body.due_date,
+        buyer_id=body.buyer_id,
+        supplier_id=body.supplier_id,
+        invoice_date=body.invoice_date,
+        due_date=body.due_date,
         notes=body.notes,
     )
     db.add(inv)
     db.flush()
     for l in body.lines:
-        db.add(InvoiceLine(invoice_id=inv.id, **l.model_dump()))
+        db.add(InvoiceLine(
+            invoice_id=inv.id,
+            description=l.description,
+            qty=l.qty,
+            unit_price_paise=l.unit_price_paise,
+            tax_pct=l.tax_pct,
+        ))
     db.commit()
     db.refresh(inv)
     return _inv_out(inv)
@@ -95,12 +139,27 @@ def create_invoice(body: InvoiceIn, db: Db, _: can("finance.write")) -> dict:
 
 @router.post("/invoices/{inv_id}/pay", status_code=201)
 def add_payment(inv_id: int, body: PaymentIn, db: Db, _: can("finance.write")) -> dict:
-    from ..services.common import DomainError
     inv = db.get(Invoice, inv_id)
     if inv is None:
         raise DomainError("Invoice not found.", 404)
     p = Payment(invoice_id=inv_id, **body.model_dump())
     db.add(p)
+    db.flush()
+    paid = sum(pm.amount_paise for pm in inv.payments)
+    subtotal = 0
+    tax = 0
+    for l in inv.lines:
+        if inv.invoice_type == "sale":
+            cm = meters_decimal_to_cm(l.qty)
+            line_base = compute_fabric_line_total(cm, l.unit_price_paise)
+        else:
+            g = kg_decimal_to_g(l.qty)
+            line_base = compute_yarn_line_total(g, l.unit_price_paise)
+        line_tax = compute_tax(line_base, l.tax_pct)
+        subtotal += line_base
+        tax += line_tax
+    if paid >= (subtotal + tax):
+        inv.status = "paid"
     db.commit()
     db.refresh(inv)
     return _inv_out(inv)

@@ -41,6 +41,8 @@ def create_po(db: Session, *, supplier_id: int, order_date: date,
             qty_kg=line["qty_kg"],
             rate_per_kg_paise=line["rate_per_kg_paise"],
         ))
+    db.flush()
+    db.refresh(po)
     audit(db, entity="PurchaseOrder", entity_id=po.id, action="create", user_id=user_id)
     return po
 
@@ -103,12 +105,19 @@ def receive_yarn(db: Session, *, po_id: int, po_line_id: int,
         item_id=line.item_id,
         lot_number=lot_number,
         qty_g=qty_g,
+        remaining_g=qty_g,
     ))
 
     post_move(db, item_id=line.item_id, location_id=loc.id,
-              delta_g=qty_g, ref=po.ref, note=f"Receipt #{receipt.id}")
+              delta_g=qty_g, ref=po.ref, note=f"Receipt #{receipt.id}",
+              movement_type="receipt", user_id=user_id)
 
     line.received_kg = float(line.received_kg or 0) + qty_kg
-    po.status = "received"
+    total_ordered = sum(float(l.qty_kg) for l in po.lines)
+    total_received = sum(float(l.received_kg or 0) for l in po.lines)
+    if total_received >= total_ordered:
+        po.status = "received"
+    else:
+        po.status = "confirmed"
     audit(db, entity="YarnReceipt", entity_id=receipt.id, action="receive", user_id=user_id)
     return receipt

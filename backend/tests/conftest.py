@@ -42,7 +42,11 @@ def test_database():
         conn.execute("PRAGMA foreign_keys=ON")
         conn.execute("PRAGMA journal_mode=WAL")
 
-    Base.metadata.create_all(engine)
+    from alembic.config import Config
+    from alembic import command
+    cfg = Config(str(BACKEND_DIR / "alembic.ini"))
+    cfg.set_main_option("sqlalchemy.url", TEST_DB_URL)
+    command.upgrade(cfg, "head")
 
     factory = sessionmaker(bind=engine, autocommit=False, autoflush=False)
     db = factory()
@@ -103,6 +107,17 @@ def app(test_database):
 def client(app):
     with TestClient(app, raise_server_exceptions=True) as c:
         yield c
+
+
+@pytest.fixture
+def db_session(test_database):
+    """Provide a dedicated SQLAlchemy session bound to the test database."""
+    session_factory = sessionmaker(bind=test_database, autocommit=False, autoflush=False)
+    session = session_factory()
+    try:
+        yield session
+    finally:
+        session.close()
 
 
 def login(client: TestClient, username: str = "admin", password: str = "khadira2026!") -> TestClient:

@@ -1,8 +1,7 @@
-"""Finance models: invoices, lines, payments."""
-
+from decimal import Decimal
 from datetime import date, datetime, timezone
 
-from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -21,6 +20,8 @@ class Invoice(Base):
     invoice_type: Mapped[str] = mapped_column(String(20), nullable=False)  # sale | purchase
     buyer_id: Mapped[int | None] = mapped_column(ForeignKey("buyer.id"))
     supplier_id: Mapped[int | None] = mapped_column(ForeignKey("supplier.id"))
+    order_id: Mapped[int | None] = mapped_column(ForeignKey("sale_order.id"))
+    dispatch_id: Mapped[int | None] = mapped_column(ForeignKey("dispatch.id"))
     invoice_date: Mapped[date] = mapped_column(Date, nullable=False)
     due_date: Mapped[date | None] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(20), default="draft")  # draft|sent|paid|cancelled
@@ -29,6 +30,8 @@ class Invoice(Base):
 
     buyer: Mapped[Buyer | None] = relationship()
     supplier: Mapped[Supplier | None] = relationship()
+    order: Mapped["Order | None"] = relationship()
+    dispatch: Mapped["Dispatch | None"] = relationship(back_populates="invoice")
     lines: Mapped[list["InvoiceLine"]] = relationship(back_populates="invoice", cascade="all, delete-orphan")
     payments: Mapped[list["Payment"]] = relationship(back_populates="invoice", cascade="all, delete-orphan")
 
@@ -39,9 +42,9 @@ class InvoiceLine(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     invoice_id: Mapped[int] = mapped_column(ForeignKey("invoice.id"), nullable=False)
     description: Mapped[str] = mapped_column(String(200), nullable=False)
-    qty: Mapped[float] = mapped_column(Integer, nullable=False)
+    qty: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
     unit_price_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    tax_pct: Mapped[float] = mapped_column(Integer, default=0)
+    tax_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0.00"))
 
     invoice: Mapped[Invoice] = relationship(back_populates="lines")
 

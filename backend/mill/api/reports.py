@@ -41,12 +41,38 @@ def inventory_summary(db: Db, _: can["reports.read"]) -> dict:
 def quality_summary(db: Db, _: can["reports.read"]) -> dict:
     total_rolls = db.scalar(select(func.count(Roll.id))) or 0
     passed = db.scalar(select(func.count(Roll.id)).where(Roll.status.in_(["passed", "in_store", "dispatched"]))) or 0
-    rejected = db.scalar(select(func.count(Roll.id)).where(Roll.status == "rejected")) or 0
-    held = db.scalar(select(func.count(Roll.id)).where(Roll.status.in_(["awaiting_qc", "held"]))) or 0
+    rejected = db.scalar(select(func.count(Roll.id)).where(Roll.status.in_(["rejected", "reject"]))) or 0
+    rework = db.scalar(select(func.count(Roll.id)).where(Roll.status == "rework")) or 0
+    awaiting_qc = db.scalar(select(func.count(Roll.id)).where(Roll.status == "awaiting_qc")) or 0
     return {
         "total_inspected": total_rolls,
         "passed": passed,
         "rejected": rejected,
-        "held": held,
+        "rework": rework,
+        "awaiting_qc": awaiting_qc,
         "pass_rate_pct": round((passed / total_rolls) * 100, 1) if total_rolls else 100.0,
     }
+
+
+@router.get("/financial-summary")
+def financial_summary(
+    db: Db,
+    _: can["reports.read"],
+    period: str | None = None,
+    year: int | None = None,
+    month: int | None = None,
+) -> dict:
+    """Monthly financial summary with segregated Accrual and Cash views."""
+    from datetime import date
+    from ..services.financial_summary import get_financial_summary
+
+    if period:
+        parts = period.strip().split("-")
+        y, m = int(parts[0]), int(parts[1])
+    elif year is not None and month is not None:
+        y, m = int(year), int(month)
+    else:
+        today = date.today()
+        y, m = today.year, today.month
+
+    return get_financial_summary(db, year=y, month=m)

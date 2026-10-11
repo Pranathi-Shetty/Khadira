@@ -33,6 +33,9 @@ __pycache__/
 *.db-journal
 *.db-wal
 *.db-shm
+*.bak
+backups*/
+backend/backups*/
 !backend/mill_demo.db
 .pytest_cache/
 pytest-cache-files-*/

@@ -69,14 +69,24 @@ def advance(run_id: int, body: AdvanceIn, db: Db, user: can["production.write"])
 
 
 class MaterialIn(BaseModel):
-    lot_id: int
+    lot_id: int | None = None
+    item_id: int | None = None
     qty_g: int
 
 @router.post("/{run_id}/materials", status_code=201)
 def issue_material(run_id: int, body: MaterialIn, db: Db, user: can["production.write"]) -> dict:
-    rm = svc.issue_material(db, run_id, body.lot_id, body.qty_g, user.id)
-    db.commit()
-    return {"id": rm.id, "run_id": rm.run_id, "lot_id": rm.lot_id, "issued_g": rm.issued_g}
+    if body.lot_id is not None:
+        rm = svc.issue_material(db, run_id, body.lot_id, body.qty_g, user.id)
+        db.commit()
+        return {"id": rm.id, "run_id": rm.run_id, "lot_id": rm.lot_id, "issued_g": rm.issued_g}
+    else:
+        rms = svc.issue_yarn_to_run(db, run_id=run_id, qty_g=body.qty_g, item_id=body.item_id, user_id=user.id)
+        db.commit()
+        return {
+            "run_id": run_id,
+            "materials": [{"id": rm.id, "lot_id": rm.lot_id, "issued_g": rm.issued_g} for rm in rms],
+            "total_issued_g": sum(rm.issued_g for rm in rms)
+        }
 
 
 class ReconciliationIn(BaseModel):
