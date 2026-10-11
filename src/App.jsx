@@ -43,7 +43,11 @@ import {
   Coins,
   AlertTriangle,
   ChevronsUpDown,
-  LogOut
+  LogOut,
+  User,
+  UserPlus,
+  UserCheck,
+  KeyRound
 } from 'lucide-react';
 import {
   Sun,
@@ -478,6 +482,19 @@ export default function App() {
   // Toast notice
   const [toastMessage, setToastMessage] = useState('');
 
+  // Auto-clear toast notices so they never get stuck on screen
+  useEffect(() => {
+    if (!toastMessage) return;
+    if (toastMessage.includes('Switched active view') || toastMessage.includes('Switched role profile')) {
+      setToastMessage('');
+      return;
+    }
+    const timer = setTimeout(() => {
+      setToastMessage('');
+    }, 3500);
+    return () => clearTimeout(timer);
+  }, [toastMessage]);
+
   // Moving Shelf state
   const shelfScrollRef = useRef(null);
   const [currentShelfIdx, setCurrentShelfIdx] = useState(0);
@@ -498,16 +515,26 @@ export default function App() {
   const [footerEmail, setFooterEmail] = useState('');
   const [footerSubmitted, setFooterSubmitted] = useState(false);
 
-  // Terminal Login & Real Backend State
+  // Terminal Login & User-Based Auth State
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [loginMode, setLoginMode] = useState('login'); // 'login' | 'register'
+  const [loginUsername, setLoginUsername] = useState('admin');
+  const [loginPassword, setLoginPassword] = useState('');
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [loginRole, setLoginRole] = useState('Production Supervisor');
   const [dashboardRole, setDashboardRole] = useState('Production Supervisor');
-  const [loginPassword, setLoginPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState(null);
   const [loginError, setLoginError] = useState('');
+  const [userDirectory, setUserDirectory] = useState([]);
+  // New User Registration Form State
+  const [regFullName, setRegFullName] = useState('');
+  const [regUsername, setRegUsername] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regRole, setRegRole] = useState('floor_supervisor');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [dashboardSearch, setDashboardSearch] = useState('');
   const [chartHoverMonth, setChartHoverMonth] = useState(null);
 
@@ -689,7 +716,7 @@ export default function App() {
   const fetchAllLiveData = async () => {
     setIsFetchingData(true);
     try {
-      const [dashRes, itemsRes, machinesRes, ordersRes, rollsRes, runsRes, invRes, poRes, supRes, buyRes, qcRes, attRes, workersRes, wageRes] = await Promise.allSettled([
+      const [dashRes, itemsRes, machinesRes, ordersRes, rollsRes, runsRes, invRes, poRes, supRes, buyRes, qcRes, attRes, workersRes, wageRes, userDirRes] = await Promise.allSettled([
         MillAPI.getDashboard(),
         MillAPI.getItems(null, '', { all: true }),
         MillAPI.getMachines(),
@@ -704,6 +731,7 @@ export default function App() {
         MillAPI.getAttendance(),
         MillAPI.getWorkers(),
         MillAPI.getWageRuns(),
+        MillAPI.getUserDirectory(),
       ]);
 
       if (dashRes.status === 'fulfilled') setLiveDashboardMetrics(dashRes.value);
@@ -717,6 +745,7 @@ export default function App() {
       if (supRes.status === 'fulfilled' && supRes.value?.items) setLiveSuppliers(supRes.value.items);
       if (buyRes.status === 'fulfilled' && buyRes.value?.items) setLiveBuyers(buyRes.value.items);
       if (qcRes.status === 'fulfilled' && Array.isArray(qcRes.value)) setLivePendingQC(qcRes.value);
+      if (userDirRes.status === 'fulfilled' && Array.isArray(userDirRes.value)) setUserDirectory(userDirRes.value);
       if (attRes.status === 'fulfilled') {
         const attData = attRes.value;
         setLiveAttendance(Array.isArray(attData) ? attData : (attData?.items || []));
@@ -821,6 +850,15 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashCheck);
   }, []);
 
+  useEffect(() => {
+    if (isLoginModalOpen) {
+      setLoginError('');
+      MillAPI.getUserDirectory().then((users) => {
+        if (Array.isArray(users)) setUserDirectory(users);
+      }).catch(() => {});
+    }
+  }, [isLoginModalOpen]);
+
   const handleQuickDemoLogin = async (roleName = 'Plant Director') => {
     setIsAuthenticating(true);
     setLoginError('');
@@ -850,34 +888,124 @@ export default function App() {
   };
 
   const handleTerminalLogin = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     if (!loginPassword.trim()) {
-      setLoginError('Please enter role password');
+      setLoginError('Please enter password');
+      return;
+    }
+    const usernameToUse = loginUsername.trim() || ROLE_CONFIG[loginRole]?.username || 'admin';
+    if (!usernameToUse) {
+      setLoginError('Please enter or select a username');
       return;
     }
     setLoginError('');
     setIsAuthenticating(true);
 
-    const username = ROLE_CONFIG[loginRole]?.username || 'store';
-
     try {
-      const userRes = await MillAPI.login(username, loginPassword.trim());
+      const userRes = await MillAPI.login(usernameToUse, loginPassword.trim());
       setIsLoggedIn(true);
-      setDashboardRole(loginRole);
+
+      // Map role to display label
+      let mappedDashboardRole = 'Production Supervisor';
+      if (userRes.role === 'admin') mappedDashboardRole = 'Plant Director';
+      else if (userRes.role === 'owner') mappedDashboardRole = 'Accounts & Owner';
+      else if (userRes.role === 'store') mappedDashboardRole = 'Store Manager';
+      else if (userRes.role === 'qc') mappedDashboardRole = 'Quality Inspector';
+      else if (userRes.role === 'floor_supervisor') mappedDashboardRole = 'Production Supervisor';
+      else if (userRes.role === 'office') mappedDashboardRole = 'Accounts & Owner';
+      else if (userRes.role_label) mappedDashboardRole = userRes.role_label;
+
+      setDashboardRole(mappedDashboardRole);
+      setLoginRole(mappedDashboardRole);
       setLoggedInUser({
         ...userRes,
-        role: loginRole,
+        role: mappedDashboardRole,
         sessionToken: `KH-UID-${userRes.id}`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       });
-      setToastMessage(`✓ Authenticated as ${userRes.full_name || loginRole}. Backend Session Active.`);
+      setToastMessage(`✓ Welcome, ${userRes.full_name || userRes.username}! Session active as ${userRes.role_label || mappedDashboardRole}.`);
       setTimeout(() => setToastMessage(''), 4500);
       setIsLoginModalOpen(false);
       setIsDashboardOpen(true);
       fetchAllLiveData().catch(err => console.warn('Background data fetch warning:', err));
     } catch (err) {
       console.error('Login error:', err);
-      setLoginError(err.message || 'Invalid username or password. Check role password.');
+      setLoginError(err.message || 'Invalid username or password. Check credentials.');
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleRegisterUser = async (e) => {
+    e?.preventDefault();
+    setLoginError('');
+
+    if (!regUsername.trim()) {
+      setLoginError('Please enter a username');
+      return;
+    }
+    if (regUsername.trim().length < 2) {
+      setLoginError('Username must be at least 2 characters');
+      return;
+    }
+    if (!regPassword) {
+      setLoginError('Please enter a password');
+      return;
+    }
+    if (regPassword.length < 3) {
+      setLoginError('Password must be at least 3 characters');
+      return;
+    }
+    if (regConfirmPassword && regPassword !== regConfirmPassword) {
+      setLoginError('Passwords do not match');
+      return;
+    }
+
+    setIsAuthenticating(true);
+    try {
+      const newUser = await MillAPI.register({
+        username: regUsername.trim(),
+        password: regPassword,
+        full_name: regFullName.trim() || undefined,
+        email: regEmail.trim() || undefined,
+        role: regRole,
+      });
+
+      setIsLoggedIn(true);
+      let mappedDashboardRole = 'Production Supervisor';
+      if (newUser.role === 'admin') mappedDashboardRole = 'Plant Director';
+      else if (newUser.role === 'owner') mappedDashboardRole = 'Accounts & Owner';
+      else if (newUser.role === 'store') mappedDashboardRole = 'Store Manager';
+      else if (newUser.role === 'qc') mappedDashboardRole = 'Quality Inspector';
+      else if (newUser.role === 'floor_supervisor') mappedDashboardRole = 'Production Supervisor';
+      else if (newUser.role === 'office') mappedDashboardRole = 'Accounts & Owner';
+      else if (newUser.role_label) mappedDashboardRole = newUser.role_label;
+
+      setDashboardRole(mappedDashboardRole);
+      setLoginRole(mappedDashboardRole);
+      setLoggedInUser({
+        ...newUser,
+        role: mappedDashboardRole,
+        sessionToken: `KH-UID-${newUser.id}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      });
+
+      setToastMessage(`✓ User created! Logged in as ${newUser.full_name || newUser.username} (${newUser.role_label || mappedDashboardRole}).`);
+      setTimeout(() => setToastMessage(''), 4500);
+      setIsLoginModalOpen(false);
+      setIsDashboardOpen(true);
+
+      // Reset reg form
+      setRegFullName('');
+      setRegUsername('');
+      setRegEmail('');
+      setRegPassword('');
+      setRegConfirmPassword('');
+
+      fetchAllLiveData().catch(err => console.warn('Background data fetch warning:', err));
+    } catch (err) {
+      console.error('Registration error:', err);
+      setLoginError(err.message || 'Failed to create user. Please check details.');
     } finally {
       setIsAuthenticating(false);
     }
@@ -1640,7 +1768,6 @@ export default function App() {
                           onClick={() => {
                             setCurrentShift(shift);
                             setIsShiftOpen(false);
-                            setToastMessage(`Switched active view to ${shift}`);
                           }}
                         >
                           {shift}
@@ -1724,7 +1851,6 @@ export default function App() {
                           onClick={() => {
                             setDashboardRole(role);
                             setIsRoleMenuOpen(false);
-                            setToastMessage(`Switched role profile to ${role}`);
                           }}
                         >
                           {role}
@@ -3899,6 +4025,23 @@ export default function App() {
             <div className="erp-toast-pill">
               <Check size={15} style={{ color: '#10b981' }} />
               <span>{toastMessage}</span>
+              <button
+                type="button"
+                onClick={() => setToastMessage('')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  cursor: 'pointer',
+                  padding: '2px',
+                  marginLeft: '8px',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+                aria-label="Close notification"
+              >
+                <X size={13} />
+              </button>
             </div>
           )}
         </main>
@@ -4994,16 +5137,38 @@ export default function App() {
             </button>
 
             <div className="terminal-modal-body">
+              {/* Segmented Auth Tabs */}
+              <div className="terminal-auth-tabs">
+                <button
+                  type="button"
+                  className={`terminal-auth-tab ${loginMode === 'login' ? 'active' : ''}`}
+                  onClick={() => { setLoginMode('login'); setLoginError(''); }}
+                >
+                  <KeyRound size={14} />
+                  <span>Sign In</span>
+                </button>
+                <button
+                  type="button"
+                  className={`terminal-auth-tab ${loginMode === 'register' ? 'active' : ''}`}
+                  onClick={() => { setLoginMode('register'); setLoginError(''); }}
+                >
+                  <UserPlus size={14} />
+                  <span>Create New User</span>
+                </button>
+              </div>
+
               <div className="terminal-modal-header">
                 <div className="terminal-modal-badge">
                   <span className="terminal-live-dot" />
-                  <span>MILL TERMINAL GATEWAY</span>
+                  <span>{loginMode === 'login' ? 'FACTORY TERMINAL ACCESS' : 'OPERATOR REGISTRATION'}</span>
                 </div>
                 <h3 id="modal-login-title" className="terminal-modal-title">
-                  Factory Login
+                  {loginMode === 'login' ? 'User Login' : 'Register Mill Account'}
                 </h3>
                 <p className="terminal-modal-subtitle">
-                  Select your operational role and enter your authorized password to access the floor management console.
+                  {loginMode === 'login'
+                    ? 'Sign in with your username & password, pick an active floor operator, or switch accounts.'
+                    : 'Create a new user account with assigned department roles and real-time floor privileges.'}
                 </p>
               </div>
 
@@ -5011,7 +5176,7 @@ export default function App() {
                 <div className="terminal-session-status-banner">
                   <div className="session-status-left">
                     <span className="terminal-live-dot" />
-                    <span>Session: <strong>{loggedInUser?.role || 'Administrator'}</strong> ({loggedInUser?.username || 'admin'})</span>
+                    <span>Active Session: <strong>{loggedInUser?.full_name || loggedInUser?.username}</strong> ({loggedInUser?.role_label || loggedInUser?.role})</span>
                   </div>
                   <div className="session-status-right">
                     <button 
@@ -5035,140 +5200,363 @@ export default function App() {
                 </div>
               )}
 
-              <form className="terminal-modal-form" onSubmit={handleTerminalLogin}>
-                {/* Role Selector */}
-                <div className="terminal-modal-field">
-                  <label className="terminal-modal-label" htmlFor="modal-role-select">
-                    Select Factory Role
-                  </label>
-                  <div className="terminal-select-wrap">
-                    <select 
-                      id="modal-role-select"
-                      className="terminal-modal-select"
-                      value={loginRole}
-                      onChange={(e) => {
-                        setLoginRole(e.target.value);
-                        if (loginError) setLoginError('');
-                      }}
-                    >
-                      <option value="Store Manager">Store Manager (Yarn & Stock)</option>
-                      <option value="Production Supervisor">Production Supervisor (Looms & Bays)</option>
-                      <option value="Quality Inspector">Quality Inspector (4-Point Lab)</option>
-                      <option value="Accounts & Owner">Accounts & Owner (Costing & ERP)</option>
-                      <option value="Plant Director">Plant Director (Master Clearance)</option>
-                    </select>
-                  </div>
-                </div>
+              {/* ── MODE 1: USER SIGN IN ──────────────────── */}
+              {loginMode === 'login' && (
+                <form className="terminal-modal-form" onSubmit={handleTerminalLogin}>
+                  {/* Active User Quick Directory */}
+                  {userDirectory.length > 0 && (
+                    <div className="terminal-modal-field">
+                      <label className="terminal-modal-label">
+                        Quick Pick User Account
+                      </label>
+                      <div className="terminal-user-directory-bar">
+                        {userDirectory.map((u) => (
+                          <button
+                            key={u.id}
+                            type="button"
+                            className={`terminal-user-chip ${loginUsername === u.username ? 'selected' : ''}`}
+                            onClick={() => {
+                              setLoginUsername(u.username);
+                              if (u.role === 'admin') setLoginRole('Plant Director');
+                              else if (u.role === 'owner') setLoginRole('Accounts & Owner');
+                              else if (u.role === 'qc') setLoginRole('Quality Inspector');
+                              else if (u.role === 'store') setLoginRole('Store Manager');
+                              else if (u.role === 'floor_supervisor') setLoginRole('Production Supervisor');
+                              setLoginError('');
+                            }}
+                          >
+                            <User size={11} />
+                            <span><strong>{u.username}</strong> ({u.role_label || u.role})</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-                {/* Dynamic Role Scope Card */}
-                <div className="terminal-role-scope-card">
-                  <div className="terminal-role-scope-head">
-                    <span className="role-code-badge">{ROLE_DETAILS[loginRole]?.code || 'ETM'}</span>
-                    <span className="role-dept-text">{ROLE_DETAILS[loginRole]?.dept}</span>
-                  </div>
-                  <p className="role-scope-desc">{ROLE_DETAILS[loginRole]?.desc}</p>
-                </div>
-
-                {/* Password Input */}
-                <div className="terminal-modal-field">
-                  <div className="terminal-label-row">
-                    <label className="terminal-modal-label" htmlFor="modal-password-input">
-                      Role Password
+                  {/* Username Input */}
+                  <div className="terminal-modal-field">
+                    <label className="terminal-modal-label" htmlFor="modal-username-input">
+                      Username / Operator ID
                     </label>
-                    <button 
-                      type="button"
-                      className="terminal-modal-hint-btn"
-                      onClick={() => {
-                        setLoginPassword('ETM-2026');
-                        if (loginError) setLoginError('');
-                      }}
-                    >
-                      Autofill Demo (ETM-2026)
-                    </button>
+                    <div className="terminal-modal-password-wrap">
+                      <User size={15} className="terminal-modal-field-icon" />
+                      <input
+                        id="modal-username-input"
+                        type="text"
+                        placeholder="Enter username (e.g. admin, owner, supervisor)..."
+                        className="terminal-modal-text-input"
+                        value={loginUsername}
+                        onChange={(e) => {
+                          setLoginUsername(e.target.value);
+                          if (loginError) setLoginError('');
+                        }}
+                      />
+                    </div>
                   </div>
 
-                  <div className="terminal-modal-password-wrap">
-                    <Lock size={15} className="terminal-modal-field-icon" />
-                    <input 
-                      id="modal-password-input"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder={`Enter password for ${loginRole}...`}
-                      className="terminal-modal-password-input"
-                      value={loginPassword}
-                      autoFocus
-                      onChange={(e) => {
-                        setLoginPassword(e.target.value);
-                        if (loginError) setLoginError('');
-                      }}
-                    />
-                    <button 
-                      type="button" 
-                      className="terminal-modal-eye-toggle"
-                      onClick={() => setShowPassword(!showPassword)}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </button>
-                  </div>
-                  {loginError && <p className="terminal-modal-error">{loginError}</p>}
-                </div>
-
-                {/* Submit Button */}
-                <button 
-                  type="submit" 
-                  className="terminal-modal-submit-btn" 
-                  id="modal-login-submit"
-                  disabled={isAuthenticating}
-                >
-                  <span>{isAuthenticating ? 'Connecting to Core Backend...' : 'Authenticate & Access Console'}</span>
-                  <ArrowRight size={15} />
-                </button>
-
-                {/* 1-Click Instant Demo Login by Role */}
-                <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #EFEAE2' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#8C827A', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
-                    ⚡ 1-Click Instant Demo Login:
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '6px' }}>
-                    {Object.keys(ROLE_CONFIG).map((role) => (
-                      <button
-                        key={role}
+                  {/* Password Input */}
+                  <div className="terminal-modal-field">
+                    <div className="terminal-label-row">
+                      <label className="terminal-modal-label" htmlFor="modal-password-input">
+                        Account Password
+                      </label>
+                      <button 
                         type="button"
-                        onClick={() => handleQuickDemoLogin(role)}
-                        disabled={isAuthenticating}
-                        style={{
-                          background: '#FDFCF9',
-                          border: '1px solid #E2DCD5',
-                          borderRadius: '6px',
-                          padding: '7px 8px',
-                          fontSize: '11px',
-                          fontWeight: 500,
-                          color: '#2D2825',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          textAlign: 'left'
+                        className="terminal-modal-hint-btn"
+                        onClick={() => {
+                          setLoginPassword('khadira2026!');
+                          if (loginError) setLoginError('');
                         }}
                       >
-                        <span>{role}</span>
-                        <span style={{ fontSize: '9px', color: '#9E9287', background: '#F0ECE4', padding: '1px 4px', borderRadius: '4px' }}>
-                          {ROLE_CONFIG[role].code}
-                        </span>
+                        Autofill Demo Password (khadira2026!)
                       </button>
-                    ))}
+                    </div>
+
+                    <div className="terminal-modal-password-wrap">
+                      <Lock size={15} className="terminal-modal-field-icon" />
+                      <input 
+                        id="modal-password-input"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Enter account password..."
+                        className="terminal-modal-password-input"
+                        value={loginPassword}
+                        autoFocus
+                        onChange={(e) => {
+                          setLoginPassword(e.target.value);
+                          if (loginError) setLoginError('');
+                        }}
+                      />
+                      <button 
+                        type="button" 
+                        className="terminal-modal-eye-toggle"
+                        onClick={() => setShowPassword(!showPassword)}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                    {loginError && <p className="terminal-modal-error">{loginError}</p>}
                   </div>
-                </div>
-              </form>
+
+                  {/* Submit Button */}
+                  <button 
+                    type="submit" 
+                    className="terminal-modal-submit-btn" 
+                    id="modal-login-submit"
+                    disabled={isAuthenticating}
+                  >
+                    <span>{isAuthenticating ? 'Connecting to Core Backend...' : 'Sign In & Access Console'}</span>
+                    <ArrowRight size={15} />
+                  </button>
+
+                  <div style={{ textAlign: 'center', marginTop: '4px' }}>
+                    <button
+                      type="button"
+                      className="terminal-modal-hint-btn"
+                      style={{ fontSize: '12px', color: '#10B981' }}
+                      onClick={() => { setLoginMode('register'); setLoginError(''); }}
+                    >
+                      Need a new account? Create New User →
+                    </button>
+                  </div>
+
+                  {/* 1-Click Instant Demo Login by Role */}
+                  <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 600, color: '#8C827A', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                      ⚡ 1-Click Instant Demo Roles:
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '6px' }}>
+                      {Object.keys(ROLE_CONFIG).map((role) => (
+                        <button
+                          key={role}
+                          type="button"
+                          onClick={() => handleQuickDemoLogin(role)}
+                          disabled={isAuthenticating}
+                          style={{
+                            background: '#FDFCF9',
+                            border: '1px solid #E2DCD5',
+                            borderRadius: '6px',
+                            padding: '7px 8px',
+                            fontSize: '11px',
+                            fontWeight: 500,
+                            color: '#2D2825',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            textAlign: 'left'
+                          }}
+                        >
+                          <span>{role}</span>
+                          <span style={{ fontSize: '9px', color: '#9E9287', background: '#F0ECE4', padding: '1px 4px', borderRadius: '4px' }}>
+                            {ROLE_CONFIG[role].code}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </form>
+              )}
+
+              {/* ── MODE 2: CREATE NEW USER ──────────────────── */}
+              {loginMode === 'register' && (
+                <form className="terminal-modal-form" onSubmit={handleRegisterUser}>
+                  <div className="terminal-form-grid-2">
+                    {/* Full Name */}
+                    <div className="terminal-modal-field">
+                      <label className="terminal-modal-label" htmlFor="reg-fullname">
+                        Full Name
+                      </label>
+                      <div className="terminal-modal-password-wrap">
+                        <User size={15} className="terminal-modal-field-icon" />
+                        <input
+                          id="reg-fullname"
+                          type="text"
+                          placeholder="e.g. Priya Sharma"
+                          className="terminal-modal-text-input"
+                          value={regFullName}
+                          onChange={(e) => {
+                            setRegFullName(e.target.value);
+                            if (loginError) setLoginError('');
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Username */}
+                    <div className="terminal-modal-field">
+                      <label className="terminal-modal-label" htmlFor="reg-username">
+                        Username *
+                      </label>
+                      <div className="terminal-modal-password-wrap">
+                        <UserCheck size={15} className="terminal-modal-field-icon" />
+                        <input
+                          id="reg-username"
+                          type="text"
+                          required
+                          placeholder="e.g. priya_qc"
+                          className="terminal-modal-text-input"
+                          value={regUsername}
+                          onChange={(e) => {
+                            setRegUsername(e.target.value);
+                            if (loginError) setLoginError('');
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Email (Optional) */}
+                  <div className="terminal-modal-field">
+                    <label className="terminal-modal-label" htmlFor="reg-email">
+                      Email Address (Optional)
+                    </label>
+                    <div className="terminal-modal-password-wrap">
+                      <span className="terminal-modal-field-icon" style={{ fontSize: '13px', lineHeight: 1 }}>@</span>
+                      <input
+                        id="reg-email"
+                        type="email"
+                        placeholder="e.g. priya@khadiramills.com"
+                        className="terminal-modal-text-input"
+                        value={regEmail}
+                        onChange={(e) => {
+                          setRegEmail(e.target.value);
+                          if (loginError) setLoginError('');
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Mill Role Selection */}
+                  <div className="terminal-modal-field">
+                    <label className="terminal-modal-label" htmlFor="reg-role-select">
+                      Assigned Mill Role & Permissions *
+                    </label>
+                    <div className="terminal-select-wrap">
+                      <select
+                        id="reg-role-select"
+                        className="terminal-modal-select"
+                        value={regRole}
+                        onChange={(e) => {
+                          setRegRole(e.target.value);
+                          if (loginError) setLoginError('');
+                        }}
+                      >
+                        <option value="floor_supervisor">Floor Supervisor (Looms & Shifts)</option>
+                        <option value="qc">QC Inspector (ASTM 4-Point Lab)</option>
+                        <option value="store">Store Keeper (Yarn & Stock Warehouse)</option>
+                        <option value="office">Office Staff (Sales Orders & Invoices)</option>
+                        <option value="owner">Mill Owner (Financials & Margins)</option>
+                        <option value="admin">Administrator (Master Console Clearance)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Role Scope Preview */}
+                  <div className="terminal-role-scope-card">
+                    <div className="terminal-role-scope-head">
+                      <span className="role-code-badge">
+                        {regRole === 'admin' ? 'PD-05' : regRole === 'owner' ? 'OW-04' : regRole === 'qc' ? 'QC-03' : regRole === 'store' ? 'SM-01' : 'FS-02'}
+                      </span>
+                      <span className="role-dept-text">
+                        {regRole === 'admin' ? 'Executive Director' : regRole === 'owner' ? 'Mill Owner & Commercial' : regRole === 'qc' ? 'Quality Assurance' : regRole === 'store' ? 'Warehouse & Yarn Intake' : 'Loom Shed Operations'}
+                      </span>
+                    </div>
+                    <p className="role-scope-desc">
+                      {regRole === 'admin'
+                        ? 'Full system overrides, user provisioning, master operations audit.'
+                        : regRole === 'owner'
+                        ? 'Profit & loss reports, costing analysis, buyer receivables and invoices.'
+                        : regRole === 'qc'
+                        ? '4-point fabric defect logs, lab tensile inspection, Grade A/B approvals.'
+                        : regRole === 'store'
+                        ? 'Cotton & yarn bale goods receipts, warehouse lot moves, transfer dispatch.'
+                        : regRole === 'office'
+                        ? 'Buyer order intake, invoice generation, dispatch delivery waybills.'
+                        : 'Loom machine status, shift operator rosters, doffing pieces off looms.'}
+                    </p>
+                  </div>
+
+                  {/* Passwords */}
+                  <div className="terminal-form-grid-2">
+                    <div className="terminal-modal-field">
+                      <label className="terminal-modal-label" htmlFor="reg-password">
+                        Password *
+                      </label>
+                      <div className="terminal-modal-password-wrap">
+                        <Lock size={15} className="terminal-modal-field-icon" />
+                        <input
+                          id="reg-password"
+                          type={showPassword ? 'text' : 'password'}
+                          required
+                          placeholder="Min 3 characters"
+                          className="terminal-modal-password-input"
+                          value={regPassword}
+                          onChange={(e) => {
+                            setRegPassword(e.target.value);
+                            if (loginError) setLoginError('');
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="terminal-modal-field">
+                      <label className="terminal-modal-label" htmlFor="reg-confirm-password">
+                        Confirm Password *
+                      </label>
+                      <div className="terminal-modal-password-wrap">
+                        <Lock size={15} className="terminal-modal-field-icon" />
+                        <input
+                          id="reg-confirm-password"
+                          type={showPassword ? 'text' : 'password'}
+                          required
+                          placeholder="Re-enter password"
+                          className="terminal-modal-password-input"
+                          value={regConfirmPassword}
+                          onChange={(e) => {
+                            setRegConfirmPassword(e.target.value);
+                            if (loginError) setLoginError('');
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {loginError && <p className="terminal-modal-error">{loginError}</p>}
+
+                  {/* Register Submit Button */}
+                  <button
+                    type="submit"
+                    className="terminal-modal-submit-btn"
+                    id="modal-register-submit"
+                    disabled={isAuthenticating}
+                    style={{ background: '#10B981', color: '#FFFFFF', borderColor: '#10B981' }}
+                  >
+                    <span>{isAuthenticating ? 'Creating User Account in DB...' : '✦ Create Mill Account & Enter Console'}</span>
+                    <ArrowRight size={15} />
+                  </button>
+
+                  <div style={{ textAlign: 'center', marginTop: '4px' }}>
+                    <button
+                      type="button"
+                      className="terminal-modal-hint-btn"
+                      style={{ fontSize: '12px', color: '#94A3B8' }}
+                      onClick={() => { setLoginMode('login'); setLoginError(''); }}
+                    >
+                      Already have an account? Sign In →
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         </div>
       )}
 
       {/* =========================================
-          19. FLOATING TOAST NOTIFICATION
+          19. FLOATING TOAST NOTIFICATION (LANDING STORE ONLY)
           ========================================= */}
-      {toastMessage && (
+      {!isDashboardOpen && toastMessage && (
         <div className="toast-notice">
           <Sparkles size={16} style={{ color: '#f7f5f0' }} />
           <span style={{ fontSize: '0.8125rem', letterSpacing: '0.08em' }}>{toastMessage}</span>

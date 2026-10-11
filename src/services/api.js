@@ -179,6 +179,21 @@ export const MillAPI = {
     });
   },
 
+  async register(userData) {
+    return apiRequest('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  },
+
+  async getRoles() {
+    return apiRequest('/auth/roles');
+  },
+
+  async getUserDirectory() {
+    return apiRequest('/auth/directory');
+  },
+
   async logout() {
     return apiRequest('/auth/logout', {
       method: 'POST',
