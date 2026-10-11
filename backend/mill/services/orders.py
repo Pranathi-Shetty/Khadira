@@ -274,4 +274,15 @@ def calculate_order_progress(db: Session, order_id: int) -> dict:
             }
             for r in rolls
         ],
+        "runs": [
+            {
+                "id": r.id,
+                "machine_code": r.machine.code if r.machine else f"M-{r.machine_id}",
+                "machine_name": r.machine.name if r.machine else None,
+                "current_stage": r.current_stage,
+                "status": r.status,
+                "yarn_used_kg": round(r.yarn_used_g / 1000.0, 2) if r.yarn_used_g else 0.0,
+            }
+            for r in runs
+        ],
     }

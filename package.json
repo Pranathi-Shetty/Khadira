@@ -15,9 +15,12 @@
     "backend:test": "cd backend && .\\.venv\\Scripts\\python.exe -m pytest tests/"
   },
   "dependencies": {
+    "clsx": "^2.1.1",
     "lucide-react": "^1.55.0",
+    "motion": "^14.1.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.18",

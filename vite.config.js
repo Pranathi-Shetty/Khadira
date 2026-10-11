@@ -1,6 +1,7 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import net from 'node:net'
+import { fileURLToPath, URL } from 'node:url'
 
 let activeBackendPort = 8011
 
@@ -47,6 +48,11 @@ export default defineConfig(({ command }) => {
   }
 
   return {
+    resolve: {
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
+      },
+    },
     plugins: [react()],
     server: {
       proxy: {

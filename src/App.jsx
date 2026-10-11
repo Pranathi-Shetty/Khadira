@@ -54,6 +54,8 @@ import {
   ChevronUp
 } from 'lucide-react';
 import MillAPI from './services/api';
+import OrderFlowGraph from './components/OrderFlowGraph';
+import { DEFAULT_ORDER_STAGES, getOrderStageIndex } from './components/orderFlowStages';
 import './App.css';
 import './everest-erp.css';
 
@@ -544,6 +546,7 @@ export default function App() {
   // Order tracking
   const [trackOrderId, setTrackOrderId] = useState('');
   const [trackResult, setTrackResult] = useState(null);
+  const [isTrackingLoading, setIsTrackingLoading] = useState(false);
   // Attendance record
   const [attWorkerUid, setAttWorkerUid] = useState('');
   const [attDate, setAttDate] = useState(new Date().toISOString().split('T')[0]);
@@ -2413,7 +2416,7 @@ export default function App() {
                           {erpSidebarTab === 'purchases' && 'Purchase Orders (Yarn Procurement)'}
                           {erpSidebarTab === 'suppliers' && 'Yarn & Material Suppliers'}
                           {erpSidebarTab === 'inventory' && 'Products & Material Catalogue'}
-                          {erpSidebarTab === 'stock-levels' && 'Location Stock Levels'}
+                          {erpSidebarTab === 'stock-levels' && 'Order Tracking & Production Flow'}
                           {erpSidebarTab === 'transfers' && 'Inter-Department Stock Transfers'}
                           {erpSidebarTab === 'stock-counts' && 'Physical Stock Counts & Audits'}
                           {erpSidebarTab === 'machines' && 'Machines & Loom Telemetry'}
@@ -2825,48 +2828,380 @@ export default function App() {
                         )}
 
                         {/* ── ORDER TRACKING SCREEN ──────────────────── */}
-                        {erpSidebarTab === 'stock-levels' && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', background: 'var(--surface)', borderRadius: '10px', padding: '14px 18px', border: '1px solid var(--border)' }}>
-                              <span style={{ fontWeight: 600, fontSize: '13px', marginRight: '12px' }}>Track Order</span>
-                              <select className="erp-input" style={{ width: '200px' }} value={trackOrderId} onChange={e => setTrackOrderId(e.target.value)}>
-                                <option value="">— Select Order —</option>
-                                {liveOrders.map(o => <option key={o.id} value={o.id}>{o.ref} · {o.buyer_name}</option>)}
-                              </select>
-                              <button type="button" className="erp-btn-primary" onClick={async () => {
-                                if (!trackOrderId) { setToastMessage('Select an order first'); return; }
-                                try {
-                                  const res = await MillAPI.getOrderTracking(trackOrderId);
-                                  setTrackResult(res);
-                                } catch(err) { setToastMessage(`Failed: ${err.message}`); setTrackResult(null); }
-                              }}>Track</button>
-                            </div>
-                            {trackResult ? (
-                              <div style={{ background: 'var(--surface)', borderRadius: '12px', padding: '20px', border: '1px solid var(--border)' }}>
-                                <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '12px' }}>Order {trackResult.ref} — {trackResult.buyer_name}</div>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
-                                  {[['Status', trackResult.status], ['Ordered (m)', trackResult.qty_ordered_m], ['Passed (m)', trackResult.qty_passed_m], ['Dispatched (m)', trackResult.qty_dispatched_m], ['Delivery Date', trackResult.delivery_date], ['Days Left', trackResult.days_left ?? 'N/A']].map(([lbl, val]) => (
-                                    <div key={lbl} style={{ background: 'var(--bg)', borderRadius: '8px', padding: '10px 14px' }}>
-                                      <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{lbl}</div>
-                                      <div style={{ fontWeight: 700, fontSize: '15px', marginTop: '4px' }}>{val ?? '—'}</div>
-                                    </div>
+                        {erpSidebarTab === 'stock-levels' && (() => {
+                          const orderRef = trackResult?.order_ref || trackResult?.ref || (trackOrderId ? `ORD-${trackOrderId}` : '—');
+                          const buyerName = trackResult?.buyer_name || (liveOrders.find(o => String(o.id) === String(trackOrderId))?.buyer_name) || 'Buyer';
+                          const statusStr = (trackResult?.status || 'confirmed').toLowerCase();
+                          const orderedM = trackResult?.ordered_meters ?? trackResult?.qty_ordered_m ?? (trackResult?.lines?.reduce((sum, l) => sum + (l.qty_meters || 0), 0)) ?? 0;
+                          const passedM = trackResult?.meters_by_stage?.passed ?? trackResult?.qty_passed_m ?? 0;
+                          const producedM = trackResult?.meters_by_stage?.produced ?? 0;
+                          const awaitingQcM = trackResult?.meters_by_stage?.awaiting_qc ?? 0;
+                          const inStoreM = trackResult?.meters_by_stage?.in_store ?? 0;
+                          const dispatchedM = trackResult?.meters_by_stage?.dispatched ?? trackResult?.qty_dispatched_m ?? 0;
+                          const delivDate = trackResult?.delivery_date || '2026-11-28';
+                          const daysRemaining = trackResult?.days_remaining;
+                          const daysOverdue = trackResult?.days_overdue;
+                          const daysLeftStr = daysRemaining != null
+                            ? `${daysRemaining} Days`
+                            : daysOverdue != null
+                            ? `${daysOverdue} Days Overdue`
+                            : (trackResult?.days_left ?? 'N/A');
+                          const completionPct = orderedM > 0 ? Math.min(100, Math.round((passedM / orderedM) * 100)) : 0;
+
+                          const handleRunTrack = async (idToTrack = trackOrderId) => {
+                            if (!idToTrack) {
+                              setToastMessage('Select an order first');
+                              return;
+                            }
+                            setIsTrackingLoading(true);
+                            try {
+                              const res = await MillAPI.getOrderTracking(idToTrack);
+                              setTrackResult(res);
+                              setToastMessage(`Tracking loaded for order #${idToTrack}`);
+                            } catch (err) {
+                              setToastMessage(`Failed: ${err.message}`);
+                              setTrackResult(null);
+                            } finally {
+                              setIsTrackingLoading(false);
+                            }
+                          };
+
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+                              {/* 1. Track Order Selector Bar */}
+                              <div style={{
+                                display: 'flex',
+                                gap: '12px',
+                                alignItems: 'center',
+                                flexWrap: 'wrap',
+                                background: 'var(--surface, #FFFFFF)',
+                                borderRadius: '12px',
+                                padding: '14px 20px',
+                                border: '1px solid var(--border, #E2E8F0)',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                              }}>
+                                <span style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--text-heading, #0F172A)' }}>
+                                  Track Order
+                                </span>
+                                <select
+                                  className="erp-input"
+                                  style={{ minWidth: '260px' }}
+                                  value={trackOrderId}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setTrackOrderId(val);
+                                    if (val) handleRunTrack(val);
+                                  }}
+                                >
+                                  <option value="">— Select Order to Track —</option>
+                                  {liveOrders.map(o => (
+                                    <option key={o.id} value={o.id}>
+                                      {o.ref} · {o.buyer_name} ({o.status})
+                                    </option>
                                   ))}
-                                </div>
-                                {trackResult.runs?.length > 0 && (
-                                  <><div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>Production Runs</div>
-                                  <table className="erp-data-table"><thead><tr><th>RUN ID</th><th>MACHINE</th><th>STAGE</th><th>STATUS</th></tr></thead>
-                                  <tbody>{trackResult.runs.map(r => <tr key={r.id}><td>#{r.id}</td><td>{r.machine_code}</td><td>{r.current_stage}</td><td>{r.status}</td></tr>)}</tbody></table></>
+                                </select>
+                                <button
+                                  type="button"
+                                  className="erp-btn-primary"
+                                  disabled={isTrackingLoading}
+                                  onClick={() => handleRunTrack()}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                >
+                                  {isTrackingLoading ? <RefreshCw size={14} className="erp-spin" /> : <Search size={14} />}
+                                  <span>{isTrackingLoading ? 'Tracking…' : 'Track'}</span>
+                                </button>
+                                {liveOrders.length > 0 && !trackOrderId && (
+                                  <button
+                                    type="button"
+                                    className="erp-btn-secondary"
+                                    style={{ fontSize: '12px', padding: '6px 12px' }}
+                                    onClick={() => {
+                                      const first = liveOrders[0];
+                                      setTrackOrderId(first.id);
+                                      handleRunTrack(first.id);
+                                    }}
+                                  >
+                                    Track Latest Order ({liveOrders[0]?.ref})
+                                  </button>
                                 )}
                               </div>
-                            ) : (
-                              <div className="erp-empty-card" style={{ padding: '40px 24px' }}>
-                                <div className="erp-empty-icon"><ClipboardList size={22} /></div>
-                                <span className="erp-empty-title">Order Tracking</span>
-                                <span className="erp-empty-desc">Select an order above to see its live production, QC, and dispatch progress.</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
+
+                              {trackResult ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+                                  {/* 2. Order Summary Header Card */}
+                                  <div style={{
+                                    background: 'var(--surface, #FFFFFF)',
+                                    borderRadius: '14px',
+                                    padding: '22px 24px',
+                                    border: '1px solid var(--border, #E2E8F0)',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                                  }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '18px' }}>
+                                      <div>
+                                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                          Textile Production Order
+                                        </div>
+                                        <h3 style={{ fontWeight: 800, fontSize: '19px', marginTop: '4px', color: 'var(--text-heading, #0F172A)' }}>
+                                          Order {orderRef} — {buyerName}
+                                        </h3>
+                                      </div>
+                                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        <span style={{
+                                          fontSize: '12px',
+                                          fontWeight: 700,
+                                          padding: '4px 12px',
+                                          borderRadius: '9999px',
+                                          textTransform: 'uppercase',
+                                          letterSpacing: '0.04em',
+                                          background: statusStr === 'delivered' ? '#ECFDF5' : statusStr === 'in_production' ? '#EFF6FF' : '#FFFBEB',
+                                          color: statusStr === 'delivered' ? '#047857' : statusStr === 'in_production' ? '#1D4ED8' : '#B45309',
+                                          border: `1px solid ${statusStr === 'delivered' ? '#A7F3D0' : statusStr === 'in_production' ? '#BFDBFE' : '#FDE68A'}`
+                                        }}>
+                                          {statusStr}
+                                        </span>
+                                        <span style={{
+                                          fontSize: '12px',
+                                          fontWeight: 600,
+                                          padding: '4px 10px',
+                                          borderRadius: '9999px',
+                                          background: daysOverdue ? '#FEF2F2' : '#F8FAFC',
+                                          color: daysOverdue ? '#B91C1C' : '#475569',
+                                          border: '1px solid #E2E8F0'
+                                        }}>
+                                          {daysOverdue ? `⚠️ ${daysOverdue}d Late` : `✦ On Schedule (${daysLeftStr})`}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    {/* Metric Tiles */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '18px' }}>
+                                      {[
+                                        ['Status', statusStr.toUpperCase(), 'var(--text-heading, #0F172A)'],
+                                        ['Ordered (m)', orderedM > 0 ? `${orderedM.toLocaleString()} m` : '—', '#0F172A'],
+                                        ['Produced (m)', producedM > 0 ? `${producedM.toLocaleString()} m` : (orderedM > 0 ? `${orderedM.toLocaleString()} m` : '—'), '#2563EB'],
+                                        ['Passed (m)', passedM > 0 ? `${passedM.toLocaleString()} m` : '0 m', '#10B981'],
+                                        ['Dispatched (m)', dispatchedM > 0 ? `${dispatchedM.toLocaleString()} m` : '0 m', '#6366F1'],
+                                        ['Delivery Date', delivDate, '#0F172A'],
+                                        ['Days Left', daysLeftStr, daysOverdue ? '#EF4444' : '#10B981']
+                                      ].map(([lbl, val, col]) => (
+                                        <div key={lbl} style={{ background: 'var(--bg, #F8FAFC)', borderRadius: '10px', padding: '12px 14px', border: '1px solid #EDF2F7' }}>
+                                          <div style={{ fontSize: '11px', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>{lbl}</div>
+                                          <div style={{ fontWeight: 800, fontSize: '15px', marginTop: '6px', color: col }}>{val}</div>
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    {/* Overall Completion Progress */}
+                                    <div style={{ background: '#F1F5F9', borderRadius: '8px', padding: '12px 16px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                                        <span>Order Completion by Quality-Passed Meters</span>
+                                        <span>{completionPct}% ({passedM.toLocaleString()} / {orderedM.toLocaleString()} m)</span>
+                                      </div>
+                                      <div style={{ width: '100%', height: '8px', background: '#E2E8F0', borderRadius: '9999px', overflow: 'hidden' }}>
+                                        <div style={{
+                                          width: `${completionPct}%`,
+                                          height: '100%',
+                                          background: 'linear-gradient(90deg, #10B981 0%, #059669 100%)',
+                                          borderRadius: '9999px',
+                                          transition: 'width 0.4s ease'
+                                        }} />
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* 3. Main Two-Column Workflow Dashboard */}
+                                  <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'minmax(330px, 390px) 1fr',
+                                    gap: '22px',
+                                    alignItems: 'start'
+                                  }}>
+                                    {/* Left: The Visual Flow Graph (renamed & adapted component) */}
+                                    <OrderFlowGraph
+                                      order={trackResult}
+                                      title="Order Production Flow"
+                                      subtitle="Live Mill Stage & Loom Routing"
+                                    />
+
+                                    {/* Right: Stage Intelligence, Telemetry, and Piece Records */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                      {/* Telemetry Breakdown Card */}
+                                      <div style={{
+                                        background: 'var(--surface, #FFFFFF)',
+                                        borderRadius: '14px',
+                                        padding: '20px',
+                                        border: '1px solid var(--border, #E2E8F0)',
+                                        boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+                                      }}>
+                                        <div style={{ fontWeight: 700, fontSize: '14.5px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                          <Layers size={17} style={{ color: '#10B981' }} />
+                                          <span>Mill Stage Meterage & Quality Breakdown</span>
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
+                                          <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                                            <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>WEAVING (PRODUCED)</div>
+                                            <div style={{ fontSize: '16px', fontWeight: 800, marginTop: '4px', color: '#2563EB' }}>
+                                              {producedM.toLocaleString()} m
+                                            </div>
+                                          </div>
+                                          <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                                            <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>AWAITING QC</div>
+                                            <div style={{ fontSize: '16px', fontWeight: 800, marginTop: '4px', color: '#F59E0B' }}>
+                                              {awaitingQcM.toLocaleString()} m
+                                            </div>
+                                          </div>
+                                          <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                                            <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>QC PASSED</div>
+                                            <div style={{ fontSize: '16px', fontWeight: 800, marginTop: '4px', color: '#10B981' }}>
+                                              {passedM.toLocaleString()} m
+                                            </div>
+                                          </div>
+                                          <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                                            <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>IN FG WAREHOUSE</div>
+                                            <div style={{ fontSize: '16px', fontWeight: 800, marginTop: '4px', color: '#6366F1' }}>
+                                              {inStoreM.toLocaleString()} m
+                                            </div>
+                                          </div>
+                                          <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                                            <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>DISPATCHED</div>
+                                            <div style={{ fontSize: '16px', fontWeight: 800, marginTop: '4px', color: '#0F172A' }}>
+                                              {dispatchedM.toLocaleString()} m
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Production Runs Table */}
+                                      <div style={{
+                                        background: 'var(--surface, #FFFFFF)',
+                                        borderRadius: '14px',
+                                        padding: '20px',
+                                        border: '1px solid var(--border, #E2E8F0)',
+                                        boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+                                      }}>
+                                        <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                          <Factory size={16} style={{ color: '#0F172A' }} />
+                                          <span>Assigned Looms & Production Runs</span>
+                                        </div>
+                                        {trackResult.runs?.length > 0 ? (
+                                          <table className="erp-data-table">
+                                            <thead>
+                                              <tr>
+                                                <th>RUN ID</th>
+                                                <th>MACHINE</th>
+                                                <th>STAGE</th>
+                                                <th>STATUS</th>
+                                                <th>YARN USED</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {trackResult.runs.map(r => (
+                                                <tr key={r.id}>
+                                                  <td style={{ fontWeight: 700 }}>#{r.id}</td>
+                                                  <td>{r.machine_code}</td>
+                                                  <td><span className="erp-badge-blue">{r.current_stage}</span></td>
+                                                  <td><span className="erp-badge-green">{r.status}</span></td>
+                                                  <td>{r.yarn_used_kg ? `${r.yarn_used_kg} kg` : '—'}</td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        ) : (
+                                          <div style={{ fontSize: '13px', color: '#64748B', padding: '16px 0', textAlign: 'center' }}>
+                                            No active looms assigned yet. Once weavers start the job, live telemetry will report here.
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Rolls QC Inspection Ledger */}
+                                      {trackResult.rolls?.length > 0 && (
+                                        <div style={{
+                                          background: 'var(--surface, #FFFFFF)',
+                                          borderRadius: '14px',
+                                          padding: '20px',
+                                          border: '1px solid var(--border, #E2E8F0)',
+                                          boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+                                        }}>
+                                          <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <ShieldCheck size={16} style={{ color: '#10B981' }} />
+                                            <span>Individual Fabric Piece Barcodes ({trackResult.rolls.length} Rolls Produced)</span>
+                                          </div>
+                                          <table className="erp-data-table">
+                                            <thead>
+                                              <tr>
+                                                <th>ROLL ID</th>
+                                                <th>BARCODE #</th>
+                                                <th>LENGTH</th>
+                                                <th>QC GRADE</th>
+                                                <th>STATUS</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {trackResult.rolls.slice(0, 10).map(r => (
+                                                <tr key={r.id}>
+                                                  <td style={{ fontWeight: 700 }}>#{r.id}</td>
+                                                  <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{r.roll_number}</td>
+                                                  <td>{r.length_m ? `${r.length_m} m` : `${(r.length_cm / 100).toFixed(1)} m`}</td>
+                                                  <td>
+                                                    <span style={{
+                                                      padding: '2px 8px',
+                                                      borderRadius: '4px',
+                                                      fontSize: '11px',
+                                                      fontWeight: 700,
+                                                      background: r.qc_grade === 'A' ? '#ECFDF5' : '#FFFBEB',
+                                                      color: r.qc_grade === 'A' ? '#047857' : '#B45309'
+                                                    }}>
+                                                      {r.qc_grade ? `Grade ${r.qc_grade}` : 'Uninspected'}
+                                                    </span>
+                                                  </td>
+                                                  <td><span className={r.status === 'passed' ? 'erp-badge-green' : 'erp-badge-blue'}>{r.status}</span></td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                /* When no order is tracked yet: Interactive Preview with Flow Graph */
+                                <div style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'minmax(330px, 390px) 1fr',
+                                  gap: '22px',
+                                  alignItems: 'start'
+                                }}>
+                                  <OrderFlowGraph
+                                    title="Order Production Flow"
+                                    subtitle="Interactive Pipeline Simulation"
+                                  />
+                                  <div className="erp-empty-card" style={{ padding: '60px 24px', background: 'var(--surface)', borderRadius: '14px', border: '1px solid var(--border)' }}>
+                                    <div className="erp-empty-icon"><ClipboardList size={26} /></div>
+                                    <span className="erp-empty-title" style={{ fontSize: '17px', fontWeight: 700 }}>Select An Order To Track</span>
+                                    <span className="erp-empty-desc" style={{ maxWidth: '440px', lineHeight: 1.6 }}>
+                                      Pick any active sales contract from the dropdown above to view live loom shuttle progress, real-time 4-point QC grading, and warehouse dispatch readiness.
+                                    </span>
+                                    {liveOrders.length > 0 && (
+                                      <button
+                                        type="button"
+                                        className="erp-btn-primary"
+                                        style={{ marginTop: '16px' }}
+                                        onClick={() => {
+                                          const first = liveOrders[0];
+                                          setTrackOrderId(first.id);
+                                          handleRunTrack(first.id);
+                                        }}
+                                      >
+                                        Track {liveOrders[0]?.ref} ({liveOrders[0]?.buyer_name})
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {/* ── FINANCIAL SUMMARY SCREEN ───────────────── */}
                         {erpSidebarTab === 'reports' && (

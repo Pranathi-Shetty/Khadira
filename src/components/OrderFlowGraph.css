@@ -1,0 +1,314 @@
+/* =====================================================================
+   KHADIRA TEXTILE MILLS — ORDER FLOW GRAPH
+   Visual rail & spring flight path for textile order tracking
+   ===================================================================== */
+
+.order-flow-wrapper {
+  --rail: #10B981;
+  --rail-glow: rgba(16, 185, 129, 0.45);
+  --flow-bg: #11141B;
+  --flow-surface: #181C26;
+  --flow-border: rgba(255, 255, 255, 0.09);
+  --flow-text: #F1F5F9;
+  --flow-muted: #8E9CAE;
+  --flow-dim: #546072;
+  
+  display: flex;
+  flex-direction: column;
+  background: var(--flow-bg);
+  color: var(--flow-text);
+  border: 1px solid var(--flow-border);
+  border-radius: 14px;
+  padding: 22px 24px;
+  box-shadow: 0 12px 36px -4px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Plus Jakarta Sans', sans-serif;
+}
+
+/* Subtle background grid / weave watermark */
+.order-flow-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle at top right, rgba(16, 185, 129, 0.08), transparent 70%);
+  pointer-events: none;
+}
+
+.order-flow-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.order-flow-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.order-flow-title-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10B981;
+}
+
+.order-flow-title-text {
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #F8FAFC;
+}
+
+.order-flow-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #34D399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.order-flow-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10B981;
+  box-shadow: 0 0 8px #10B981;
+  animation: flowPulse 2s infinite;
+}
+
+@keyframes flowPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+/* Nav & List container */
+.order-flow-nav {
+  position: relative;
+  width: 100%;
+}
+
+.order-flow-list {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.order-flow-item {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Stage Button */
+.order-flow-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 8px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+  padding-right: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: rgba(241, 245, 249, 0.55);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.order-flow-button:hover {
+  color: rgba(241, 245, 249, 0.95);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.order-flow-button.is-active {
+  font-weight: 600;
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.order-flow-button.is-covered:not(.is-active) {
+  color: rgba(241, 245, 249, 0.85);
+}
+
+.order-flow-label-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.order-flow-label {
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.order-flow-button.is-active .order-flow-label {
+  color: #FFFFFF;
+  font-weight: 700;
+}
+
+.order-flow-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  letter-spacing: 0.02em;
+}
+
+.order-flow-button.is-active .order-flow-badge {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34D399;
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.order-flow-button.is-covered:not(.is-active) .order-flow-badge {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10B981;
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+/* Plane / Shuttle Flight Marker */
+.order-flow-marker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin-left: -8px;
+  margin-top: -8px;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  color: #FFFFFF;
+  filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.8)) drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
+  z-index: 10;
+  transform-origin: center center;
+}
+
+.order-flow-marker svg {
+  width: 16px;
+  height: 16px;
+  overflow: visible;
+}
+
+/* SVG Line & Circles */
+.order-flow-svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.order-flow-rail-bg {
+  stroke: rgba(255, 255, 255, 0.18);
+}
+
+.order-flow-rail-active {
+  stroke: var(--rail);
+  filter: drop-shadow(0 0 3px var(--rail-glow));
+}
+
+.order-flow-node-dot {
+  transition: fill 0.2s ease, stroke 0.2s ease;
+}
+
+.order-flow-node-dot.covered {
+  fill: var(--rail);
+  stroke: var(--rail);
+}
+
+.order-flow-node-dot.uncovered {
+  fill: transparent;
+  stroke: rgba(255, 255, 255, 0.25);
+}
+
+/* Detail Drawer / Info Panel */
+.order-flow-detail-card {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.order-flow-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.order-flow-detail-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #F1F5F9;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.order-flow-detail-desc {
+  font-size: 12px;
+  color: var(--flow-muted);
+  line-height: 1.5;
+}
+
+.order-flow-detail-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.order-flow-stat-box {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.order-flow-stat-label {
+  font-size: 10px;
+  color: #94A3B8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.order-flow-stat-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #F8FAFC;
+  margin-top: 2px;
+}
