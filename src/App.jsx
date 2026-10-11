@@ -774,7 +774,25 @@ export default function App() {
               }
             }
           } catch {
-            // Not authenticated yet
+            // Not authenticated yet — auto-authenticate to demo session so demo datasets load immediately in UI
+            try {
+              const demoUser = await MillAPI.login('admin', 'khadira2026!');
+              if (demoUser && demoUser.id) {
+                hasSession = true;
+                setIsLoggedIn(true);
+                setIsDashboardOpen(true);
+                setLoggedInUser({
+                  ...demoUser,
+                  role: 'Plant Director',
+                  sessionToken: `KH-UID-${demoUser.id}`,
+                  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                });
+                setDashboardRole('Plant Director');
+                setLoginRole('Plant Director');
+              }
+            } catch (demoErr) {
+              console.warn('Demo session auto-connect note:', demoErr);
+            }
           }
           if (hasSession) {
             await fetchAllLiveData();
@@ -788,6 +806,8 @@ export default function App() {
     const handleHashCheck = () => {
       if (window.location.hash === '#login' || window.location.hash === '#terminal-login') {
         setIsLoginModalOpen(true);
+      } else if (window.location.hash === '#dashboard') {
+        setIsDashboardOpen(true);
       }
     };
     handleHashCheck();
@@ -797,6 +817,34 @@ export default function App() {
 
     return () => window.removeEventListener('hashchange', handleHashCheck);
   }, []);
+
+  const handleQuickDemoLogin = async (roleName = 'Plant Director') => {
+    setIsAuthenticating(true);
+    setLoginError('');
+    const username = ROLE_CONFIG[roleName]?.username || 'admin';
+    try {
+      const userRes = await MillAPI.login(username, 'khadira2026!');
+      setIsLoggedIn(true);
+      setDashboardRole(roleName);
+      setLoginRole(roleName);
+      setLoggedInUser({
+        ...userRes,
+        role: roleName,
+        sessionToken: `KH-UID-${userRes.id}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      });
+      setToastMessage(`✓ Logged in as ${userRes.full_name || roleName} (Demo Mode)`);
+      setTimeout(() => setToastMessage(''), 4500);
+      setIsLoginModalOpen(false);
+      setIsDashboardOpen(true);
+      await fetchAllLiveData();
+    } catch (err) {
+      console.error('Quick demo login error:', err);
+      setLoginError(err.message || 'Failed to authenticate demo user');
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
 
   const handleTerminalLogin = async (e) => {
     e.preventDefault();
@@ -3669,20 +3717,25 @@ export default function App() {
               <span>TERMINAL LOGIN</span>
               <ArrowRight size={12} className="tab-arrow-icon" />
             </button>
-            {isLoggedIn && (
-              <button 
-                type="button" 
-                className="hero-login-tab-btn active" 
-                onClick={() => setIsDashboardOpen(true)}
-                id="hero-login-tab-active"
-                aria-label="Launch Floor Dashboard"
-              >
-                <span className="terminal-live-dot" />
-                <Sparkles size={12} />
-                <span>{loggedInUser?.role || 'Admin'} · OPEN DASHBOARD</span>
-                <ArrowRight size={12} className="tab-arrow-icon" />
-              </button>
-            )}
+            <button 
+              type="button" 
+              className="hero-login-tab-btn active" 
+              onClick={() => {
+                if (!isLoggedIn) {
+                  handleQuickDemoLogin('Plant Director');
+                } else {
+                  setIsDashboardOpen(true);
+                  fetchAllLiveData();
+                }
+              }}
+              id="hero-login-tab-active"
+              aria-label="Launch Floor Dashboard"
+            >
+              <span className="terminal-live-dot" />
+              <Sparkles size={12} />
+              <span>{isLoggedIn ? `${loggedInUser?.role || 'Admin'} · OPEN DASHBOARD` : '⚡ LAUNCH DEMO DASHBOARD (25 Orders · 131 Rolls)'}</span>
+              <ArrowRight size={12} className="tab-arrow-icon" />
+            </button>
           </div>
         </div>
 
@@ -4735,6 +4788,42 @@ export default function App() {
                   <span>{isAuthenticating ? 'Connecting to Core Backend...' : 'Authenticate & Access Console'}</span>
                   <ArrowRight size={15} />
                 </button>
+
+                {/* 1-Click Instant Demo Login by Role */}
+                <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #EFEAE2' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#8C827A', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                    ⚡ 1-Click Instant Demo Login:
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '6px' }}>
+                    {Object.keys(ROLE_CONFIG).map((role) => (
+                      <button
+                        key={role}
+                        type="button"
+                        onClick={() => handleQuickDemoLogin(role)}
+                        disabled={isAuthenticating}
+                        style={{
+                          background: '#FDFCF9',
+                          border: '1px solid #E2DCD5',
+                          borderRadius: '6px',
+                          padding: '7px 8px',
+                          fontSize: '11px',
+                          fontWeight: 500,
+                          color: '#2D2825',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <span>{role}</span>
+                        <span style={{ fontSize: '9px', color: '#9E9287', background: '#F0ECE4', padding: '1px 4px', borderRadius: '4px' }}>
+                          {ROLE_CONFIG[role].code}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </form>
             </div>
           </div>

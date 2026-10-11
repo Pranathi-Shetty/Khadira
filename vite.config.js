@@ -2,12 +2,12 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import net from 'node:net'
 
-let activeBackendPort = 8000
+let activeBackendPort = 8011
 
 function probePort(port) {
   return new Promise((resolve) => {
     const s = new net.Socket()
-    s.setTimeout(150)
+    s.setTimeout(500)
     s.on('connect', () => {
       s.destroy()
       resolve(true)
@@ -25,16 +25,16 @@ function probePort(port) {
 }
 
 async function refreshActivePort() {
-  if (await probePort(8000)) {
-    activeBackendPort = 8000
-    return 8000
-  }
   if (await probePort(8011)) {
     activeBackendPort = 8011
     return 8011
   }
-  activeBackendPort = 8000
-  return 8000
+  if (await probePort(8000)) {
+    activeBackendPort = 8000
+    return 8000
+  }
+  activeBackendPort = 8011
+  return 8011
 }
 
 export default defineConfig(({ command }) => {
@@ -51,7 +51,7 @@ export default defineConfig(({ command }) => {
     server: {
       proxy: {
         '/api': {
-          target: 'http://127.0.0.1:8000',
+          target: 'http://127.0.0.1:8011',
           changeOrigin: true,
           router: () => `http://127.0.0.1:${activeBackendPort}`,
         },
